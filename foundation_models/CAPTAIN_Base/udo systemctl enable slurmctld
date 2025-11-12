@@ -1,0 +1,7 @@
+[0;1;31m×[0m slurmd.service - Slurm node daemon
+     Loaded: loaded (]8;;file://computeinstance-e00nj1v3e03g2xwx96/usr/lib/systemd/system/slurmd.service/usr/lib/systemd/system/slurmd.service]8;;; [0;1;32menabled[0m; preset: [0;1;32menabled[0m)
+     Active: [0;1;31mfailed[0m (Result: exit-code) since Mon 2025-11-10 06:32:11 UTC; 2min 35s ago
+       Docs: ]8;;man:slurmd(8)man:slurmd(8)]8;;
+    Process: 663247 ExecStart=/usr/sbin/slurmd --systemd $SLURMD_OPTIONS [0;1;31m(code=exited, status=1/FAILURE)[0m
+   Main PID: 663247 (code=exited, status=1/FAILURE)
+        CPU: 2ms

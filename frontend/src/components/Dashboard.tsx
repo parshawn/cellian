@@ -328,6 +328,10 @@ useEffect(() => {
   }
 }, [hasDrugResults, resultView]);
 
+useEffect(() => {
+  setResultView("gene");
+}, [workflowResults]);
+
 const currentRNADE =
   useDrugData ? (degsDrug.length > 0 ? degsDrug : degs) : (degs.length > 0 ? degs : degsDrug);
 const currentPathways =
@@ -415,7 +419,7 @@ const significantProtein = currentProteinDE.filter(d => d.pval < 0.05);
           {completedNodes.includes("rna") ? (
             <>
               {/* Summary Cards for RNA */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card className="p-4 bg-gradient-to-br from-rna/10 to-rna/5 border-rna/20">
                   <div className="flex items-center justify-between">
                     <div>
@@ -442,16 +446,6 @@ const significantProtein = currentProteinDE.filter(d => d.pval < 0.05);
                       <p className="text-2xl font-bold text-red-600">{downregulatedRNA.length}</p>
                     </div>
                     <TrendingDown className="w-8 h-8 text-red-600" />
-                  </div>
-                </Card>
-                <Card className="p-4 bg-gradient-to-br from-protein/10 to-protein/5 border-protein/20">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Pathways</p>
-                      <p className="text-2xl font-bold text-protein">{currentPathways.filter(p => (p.pval ?? p.FDR ?? 1) < 0.05).length}</p>
-                      <p className="text-xs text-muted-foreground mt-1">p-value &lt; 0.05</p>
-                    </div>
-                    <Target className="w-8 h-8 text-protein" />
                   </div>
                 </Card>
               </div>

@@ -32,6 +32,7 @@ from scipy import stats
 from scipy.stats import pearsonr, spearmanr
 import matplotlib.pyplot as plt
 import seaborn as sns
+import requests
 
 warnings.filterwarnings('ignore')
 
@@ -66,6 +67,9 @@ try:
 except ImportError:
     NETWORKX_AVAILABLE = False
     print("Warning: networkx not available. PPI network analysis will be skipped.")
+
+SPEEDRICHR_ADD_URL = "https://maayanlab.cloud/speedrichr/api/addList"
+SPEEDRICHR_ENRICH_URL = "https://maayanlab.cloud/speedrichr/api/enrich"
 
 
 
@@ -462,6 +466,74 @@ def run_gsea(rna_data, control_data, gene_sets='KEGG_2021_Human', output_dir=Non
         return None
 
 
+def run_speedrichr_enrichment(gene_list, gene_sets):
+    """
+    Use the SpeedRichr API when the standard Enrichr endpoint is unavailable.
+    """
+    if not gene_list:
+        return None
+    
+    try:
+        files = {
+            'list': ('genes.txt', '\n'.join(gene_list))
+        }
+        response = requests.post(
+            SPEEDRICHR_ADD_URL,
+            data={'description': 'cellian-pathway-analysis'},
+            files=files,
+            timeout=30
+        )
+        response.raise_for_status()
+        user_list_id = response.json().get("userListId")
+        if not user_list_id:
+            print("  SpeedRichr fallback failed: missing userListId")
+            return None
+        
+        params = {
+            'userListId': user_list_id,
+            'geneSetLibrary': gene_sets,
+            'backgroundType': gene_sets
+        }
+        enrich_response = requests.get(
+            SPEEDRICHR_ENRICH_URL,
+            params=params,
+            timeout=60
+        )
+        enrich_response.raise_for_status()
+        payload = enrich_response.json()
+        records = payload.get(gene_sets) or []
+        if not records:
+            return None
+        
+        rows = []
+        for record in records:
+            if not isinstance(record, list) or len(record) < 6:
+                continue
+            rank, term, pval, zscore, combined_score, genes = record[:6]
+            adjusted = record[6] if len(record) > 6 else None
+            old_pval = record[7] if len(record) > 7 else None
+            old_adj = record[8] if len(record) > 8 else None
+            rows.append({
+                "Rank": rank,
+                "Term": term,
+                "P-value": pval,
+                "Adjusted P-value": adjusted,
+                "Z-score": zscore,
+                "Combined Score": combined_score,
+                "Genes": ";".join(genes) if isinstance(genes, list) else genes,
+                "Old P-value": old_pval,
+                "Old adjusted P-value": old_adj
+            })
+        
+        if not rows:
+            return None
+        
+        return pd.DataFrame(rows)
+    except Exception as exc:
+        print(f"  SpeedRichr fallback failed: {exc}")
+        return None
+
+
 def run_pathway_enrichment(protein_data, control_data, database='KEGG', output_dir=None, control_label='non-targeting', data_type='protein'):
     """
     Run pathway enrichment analysis on expression data (RNA or protein).
@@ -477,10 +549,6 @@ def run_pathway_enrichment(protein_data, control_data, database='KEGG', output_d
     Returns:
         Enrichment results DataFrame
     """
-    if not GSEAPY_AVAILABLE:
-        print(f"\n  Warning: gseapy not available. Skipping {database} enrichment analysis.")
-        return None
-    
     print(f"\n{'='*70}")
     print(f"PATHWAY ENRICHMENT ANALYSIS: {data_type.upper()} ({database})")
     print(f"{'='*70}")
@@ -513,63 +581,72 @@ def run_pathway_enrichment(protein_data, control_data, database='KEGG', output_d
     gene_sets = database_map.get(database, database)
     
     try:
-        # Run enrichment analysis
-        # Use cutoff=1.0 to get all results, then filter manually (prevents plotting errors)
-        print(f"  Running {database} enrichment analysis...")
-        try:
-            # Don't pass format parameter - let it default, but set outdir=None to prevent file writing
-            # This avoids the "replace() argument 2 must be str, not None" error
-            enr_results = gp.enrichr(
-                gene_list=gene_list,
-                gene_sets=gene_sets,
-                organism='Human',
-                outdir=None,  # Don't save plots/files to avoid errors
-                verbose=False,
-                cutoff=1.0  # Get all results, filter manually
-            )
-        except ValueError as e:
-            # If plotting fails due to no enriched terms, try to get results anyway
-            if "No enrich terms" in str(e) or "cutoff" in str(e).lower():
-                print(f"  Note: No enriched terms at default cutoff - trying to get all results...")
-                try:
-                    enr_results = gp.enrichr(
-                        gene_list=gene_list,
-                        gene_sets=gene_sets,
-                        organism='Human',
-                        outdir=None,  # Don't save plots
-                        verbose=False,
-                        cutoff=1.0  # Get all results
-                    )
-                except Exception as e2:
-                    print(f"  No enrichment results found for {database}")
-                    print(f"  This means none of the {len(gene_list)} significant genes/proteins map to enriched pathways")
-                    return None
-            else:
-                raise
-        
-        # Get enriched pathways - gseapy enrichr returns a dict
         enriched_pathways = None
-        if isinstance(enr_results, dict):
-            if 'res' in enr_results:
-                enriched_pathways = enr_results['res']
-            elif 'res2d' in enr_results:
-                enriched_pathways = enr_results['res2d']
+        speedrichr_used = False
+        print(f"  Running {database} enrichment analysis...")
+        if GSEAPY_AVAILABLE:
+            enr_results = None
+            try:
+                enr_results = gp.enrichr(
+                    gene_list=gene_list,
+                    gene_sets=gene_sets,
+                    organism='Human',
+                    outdir=None,
+                    verbose=False,
+                    cutoff=1.0
+                )
+            except ValueError as e:
+                if "No enrich terms" in str(e) or "cutoff" in str(e).lower():
+                    print(f"  Note: No enriched terms at default cutoff - trying to get all results...")
+                    try:
+                        enr_results = gp.enrichr(
+                            gene_list=gene_list,
+                            gene_sets=gene_sets,
+                            organism='Human',
+                            outdir=None,
+                            verbose=False,
+                            cutoff=1.0
+                        )
+                    except Exception:
+                        enr_results = None
+                else:
+                    enr_results = None
+            except Exception:
+                enr_results = None
+            
+            if enr_results is not None:
+                if isinstance(enr_results, dict):
+                    if 'res' in enr_results:
+                        enriched_pathways = enr_results['res']
+                    elif 'res2d' in enr_results:
+                        enriched_pathways = enr_results['res2d']
+                    else:
+                        for key, value in enr_results.items():
+                            if isinstance(value, pd.DataFrame):
+                                enriched_pathways = value
+                                break
+                elif hasattr(enr_results, 'res2d'):
+                    enriched_pathways = enr_results.res2d
+                elif isinstance(enr_results, pd.DataFrame):
+                    enriched_pathways = enr_results
+        
+        if enriched_pathways is None:
+            if not GSEAPY_AVAILABLE:
+                print(f"  Warning: gseapy not available. Using SpeedRichr fallback.")
             else:
-                # Try to get the first value that looks like a DataFrame
-                for key, value in enr_results.items():
-                    if isinstance(value, pd.DataFrame):
-                        enriched_pathways = value
-                        break
-                if enriched_pathways is None:
-                    print(f"  Warning: {database} enrichment results not in expected format")
-                    return None
-        elif hasattr(enr_results, 'res2d'):
-            enriched_pathways = enr_results.res2d
-        elif isinstance(enr_results, pd.DataFrame):
-            enriched_pathways = enr_results
-        else:
-            print(f"  Warning: {database} enrichment results type: {type(enr_results)}")
-            return None
+                print(f"  ⚠️  Standard Enrichr API unavailable. Trying SpeedRichr fallback...")
+            enriched_pathways = run_speedrichr_enrichment(gene_list, gene_sets)
+            if enriched_pathways is None or len(enriched_pathways) == 0:
+                print(f"  Error running {database} enrichment: Enrichr API not available and SpeedRichr fallback failed.")
+                return None
+            speedrichr_used = True
+        
+        if speedrichr_used:
+            # Ensure columns exist for downstream formatting
+            if 'Odds Ratio' not in enriched_pathways.columns:
+                enriched_pathways['Odds Ratio'] = np.nan
+            if 'Genes' in enriched_pathways.columns:
+                enriched_pathways['Genes'] = enriched_pathways['Genes'].astype(str)
         
         # Check if we have any results
         if enriched_pathways is None or len(enriched_pathways) == 0:

@@ -896,6 +896,7 @@ async def run_workflow_background(
                         str(output_dir),
                         gene_target  # Gene target
                     )
+                    results["gene_target"] = gene_target
                     
                     # Also try to collect drug results if separate files exist
                     try:
@@ -903,16 +904,18 @@ async def run_workflow_background(
                             str(output_dir),
                             drug_target  # Drug target
                         )
-                        # Merge drug results if available
-                        if drug_results and "pathway_analysis" in drug_results:
+                        if drug_results:
+                            results["drug_target"] = drug_target
                             if "pathway_analysis" not in results:
                                 results["pathway_analysis"] = {}
-                            # Add drug-specific keys
-                            for key in drug_results["pathway_analysis"]:
-                                if key not in results["pathway_analysis"]:
-                                    results["pathway_analysis"][f"{key}_drug"] = drug_results["pathway_analysis"][key]
-                    except:
-                        pass  # Ignore if drug results not found separately
+                            for key, value in (drug_results.get("pathway_analysis") or {}).items():
+                                results["pathway_analysis"][f"{key}_drug"] = value
+                            if drug_results.get("rna_metrics"):
+                                results["rna_metrics_drug"] = drug_results["rna_metrics"]
+                            if drug_results.get("protein_metrics"):
+                                results["protein_metrics_drug"] = drug_results["protein_metrics"]
+                    except Exception as merge_exc:
+                        log_fp.write(f"  ⚠️  Could not merge drug results: {merge_exc}\n")
                     
                     log_fp.write(f"Results collected successfully.\n")
                     log_fp.write(f"Results keys: {list(results.keys())}\n")

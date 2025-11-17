@@ -192,6 +192,24 @@ def prepare_protein_data(rna_adata_path, protein_file_path, target_gene, output_
             )
         protein_aligned.obs_names = rna_adata.obs_names
     
+    # Ensure observation metadata matches RNA predictions (needed for control columns)
+    try:
+        aligned_obs = rna_adata.obs.reindex(protein_aligned.obs_names)
+        columns_to_copy = []
+        if 'drugname_drugconc' in aligned_obs.columns:
+            columns_to_copy.append('drugname_drugconc')
+        if 'target_gene' in aligned_obs.columns:
+            columns_to_copy.append('target_gene')
+        if 'condition' in aligned_obs.columns:
+            columns_to_copy.append('condition')
+        if 'perturbation' in aligned_obs.columns:
+            columns_to_copy.append('perturbation')
+        if columns_to_copy:
+            for col in columns_to_copy:
+                protein_aligned.obs[col] = aligned_obs[col].values
+    except Exception as metadata_exc:
+        print(f"    Warning: Could not synchronize metadata columns with RNA predictions: {metadata_exc}")
+    
     # NEW: Add all proteins from RNA gene names that aren't already in protein file
     print(f"\n    Adding proteins from RNA gene names...")
     rna_gene_names = set(rna_adata.var_names)

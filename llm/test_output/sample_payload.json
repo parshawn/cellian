@@ -1,0 +1,343 @@
+{
+  "context": {
+    "perturbation": "KO TP53",
+    "cell_type": "HepG2",
+    "species": "human",
+    "user_question": "What happens if I knock out TP53 in HepG2 cells?"
+  },
+  "validated_edges": [
+    {
+      "source": "TP53",
+      "target": "CDKN1A",
+      "direction": "down",
+      "confidence": 0.85
+    },
+    {
+      "source": "TP53",
+      "target": "BAX",
+      "direction": "down",
+      "confidence": 0.82
+    },
+    {
+      "source": "TP53",
+      "target": "MDM2",
+      "direction": "down",
+      "confidence": 0.78
+    },
+    {
+      "source": "TP53",
+      "target": "P21",
+      "direction": "down",
+      "confidence": 0.9
+    },
+    {
+      "source": "CDKN1A",
+      "target": "CCND1",
+      "direction": "up",
+      "confidence": 0.75
+    },
+    {
+      "source": "BAX",
+      "target": "CASP3",
+      "direction": "down",
+      "confidence": 0.7
+    }
+  ],
+  "deg_list": [
+    {
+      "gene": "CDKN1A",
+      "log2fc": -2.5,
+      "pval": 0.001
+    },
+    {
+      "gene": "BAX",
+      "log2fc": -2.1,
+      "pval": 0.003
+    },
+    {
+      "gene": "MDM2",
+      "log2fc": -1.8,
+      "pval": 0.005
+    },
+    {
+      "gene": "P21",
+      "log2fc": -2.3,
+      "pval": 0.002
+    },
+    {
+      "gene": "CCND1",
+      "log2fc": 1.5,
+      "pval": 0.01
+    },
+    {
+      "gene": "CASP3",
+      "log2fc": -1.2,
+      "pval": 0.02
+    },
+    {
+      "gene": "BCL2",
+      "log2fc": 1.3,
+      "pval": 0.015
+    },
+    {
+      "gene": "PCNA",
+      "log2fc": 1.8,
+      "pval": 0.008
+    },
+    {
+      "gene": "GADD45A",
+      "log2fc": -1.5,
+      "pval": 0.012
+    },
+    {
+      "gene": "FAS",
+      "log2fc": -0.9,
+      "pval": 0.025
+    },
+    {
+      "gene": "MYC",
+      "log2fc": 1.2,
+      "pval": 0.018
+    },
+    {
+      "gene": "RB1",
+      "log2fc": -1.1,
+      "pval": 0.022
+    },
+    {
+      "gene": "ATM",
+      "log2fc": -0.8,
+      "pval": 0.03
+    },
+    {
+      "gene": "CHEK2",
+      "log2fc": -1.0,
+      "pval": 0.028
+    },
+    {
+      "gene": "PTEN",
+      "log2fc": -0.7,
+      "pval": 0.035
+    }
+  ],
+  "pathways": [
+    {
+      "id": "KEGG_P53_PATHWAY",
+      "name": "p53 signaling pathway",
+      "source": "GSEA",
+      "NES": 2.5,
+      "FDR": 0.001,
+      "member_genes": [
+        "TP53",
+        "CDKN1A",
+        "BAX",
+        "MDM2",
+        "P21",
+        "ATM",
+        "CHEK2"
+      ]
+    },
+    {
+      "id": "KEGG_CELL_CYCLE",
+      "name": "Cell cycle",
+      "source": "GSEA",
+      "NES": 2.1,
+      "FDR": 0.003,
+      "member_genes": [
+        "CDKN1A",
+        "CCND1",
+        "RB1",
+        "PCNA",
+        "MYC"
+      ]
+    },
+    {
+      "id": "KEGG_APOPTOSIS",
+      "name": "Apoptosis",
+      "source": "GSEA",
+      "NES": -2.3,
+      "FDR": 0.002,
+      "member_genes": [
+        "BAX",
+        "BCL2",
+        "CASP3",
+        "FAS"
+      ]
+    },
+    {
+      "id": "KEGG_DNA_REPAIR",
+      "name": "DNA repair",
+      "source": "PSEA",
+      "NES": -1.8,
+      "FDR": 0.01,
+      "member_genes": [
+        "ATM",
+        "CHEK2",
+        "GADD45A",
+        "TP53"
+      ]
+    },
+    {
+      "id": "REACTOME_CELL_CYCLE_CHECKPOINTS",
+      "name": "Cell cycle checkpoints",
+      "source": "GSEA",
+      "NES": 1.9,
+      "FDR": 0.008,
+      "member_genes": [
+        "TP53",
+        "CDKN1A",
+        "RB1",
+        "ATM"
+      ]
+    }
+  ],
+  "phenotypes": [
+    {
+      "phenotype_id": "HP:0001903",
+      "name": "Increased apoptosis",
+      "score": 0.75,
+      "direction": "increase",
+      "supporting_genes": [
+        "BAX",
+        "CASP3",
+        "FAS"
+      ],
+      "supporting_up_genes": [],
+      "supporting_down_genes": [
+        "BAX",
+        "CASP3",
+        "FAS"
+      ],
+      "supporting_pathways": [
+        {
+          "id": "KEGG_APOPTOSIS",
+          "name": "Apoptosis",
+          "NES": -2.3,
+          "FDR": 0.002
+        }
+      ]
+    },
+    {
+      "phenotype_id": "HP:0000086",
+      "name": "Increased cell proliferation",
+      "score": 0.82,
+      "direction": "increase",
+      "supporting_genes": [
+        "CCND1",
+        "PCNA",
+        "MYC"
+      ],
+      "supporting_up_genes": [
+        "CCND1",
+        "PCNA",
+        "MYC"
+      ],
+      "supporting_down_genes": [],
+      "supporting_pathways": [
+        {
+          "id": "KEGG_CELL_CYCLE",
+          "name": "Cell cycle",
+          "NES": 2.1,
+          "FDR": 0.003
+        }
+      ]
+    },
+    {
+      "phenotype_id": "HP:0002814",
+      "name": "Abnormal DNA repair",
+      "score": 0.68,
+      "direction": "decrease",
+      "supporting_genes": [
+        "ATM",
+        "CHEK2",
+        "GADD45A",
+        "TP53"
+      ],
+      "supporting_up_genes": [],
+      "supporting_down_genes": [
+        "ATM",
+        "CHEK2",
+        "GADD45A"
+      ],
+      "supporting_pathways": [
+        {
+          "id": "KEGG_DNA_REPAIR",
+          "name": "DNA repair",
+          "NES": -1.8,
+          "FDR": 0.01
+        }
+      ]
+    },
+    {
+      "phenotype_id": "HP:0002664",
+      "name": "Neoplasia",
+      "score": 0.71,
+      "direction": "increase",
+      "supporting_genes": [
+        "TP53",
+        "MYC",
+        "CCND1",
+        "RB1"
+      ],
+      "supporting_up_genes": [
+        "MYC",
+        "CCND1"
+      ],
+      "supporting_down_genes": [
+        "TP53",
+        "RB1"
+      ],
+      "supporting_pathways": [
+        {
+          "id": "KEGG_P53_PATHWAY",
+          "name": "p53 signaling pathway",
+          "NES": 2.5,
+          "FDR": 0.001
+        },
+        {
+          "id": "KEGG_CELL_CYCLE",
+          "name": "Cell cycle",
+          "NES": 2.1,
+          "FDR": 0.003
+        }
+      ]
+    },
+    {
+      "phenotype_id": "HP:0000952",
+      "name": "Cell cycle arrest",
+      "score": 0.58,
+      "direction": "decrease",
+      "supporting_genes": [
+        "CDKN1A",
+        "P21",
+        "RB1"
+      ],
+      "supporting_up_genes": [],
+      "supporting_down_genes": [
+        "CDKN1A",
+        "P21",
+        "RB1"
+      ],
+      "supporting_pathways": [
+        {
+          "id": "KEGG_P53_PATHWAY",
+          "name": "p53 signaling pathway",
+          "NES": 2.5,
+          "FDR": 0.001
+        },
+        {
+          "id": "REACTOME_CELL_CYCLE_CHECKPOINTS",
+          "name": "Cell cycle checkpoints",
+          "NES": 1.9,
+          "FDR": 0.008
+        }
+      ]
+    }
+  ],
+  "evidence": {
+    "datasets": [
+      "SCP1064 perturbation-CITE-seq"
+    ],
+    "papers": []
+  }
+}

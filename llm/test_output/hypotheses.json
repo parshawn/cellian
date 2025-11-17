@@ -1,0 +1,174 @@
+{
+  "hypotheses": [
+    {
+      "id": "H1",
+      "statement": "KO TP53 increases increased cell proliferation in HepG2 cells",
+      "mechanism": [
+        "Perturbation: KO TP53",
+        "Affects genes: CCND1, PCNA, MYC",
+        "Enriches pathway: Cell cycle",
+        "Predicts phenotype: Increased cell proliferation (increase)"
+      ],
+      "phenotype_support": {
+        "primary_phenotype": "Increased cell proliferation",
+        "phenotype_id": "HP:0000086",
+        "score": 0.82,
+        "direction": "increase",
+        "supporting_genes": [
+          "CCND1",
+          "PCNA",
+          "MYC"
+        ],
+        "supporting_pathways": [
+          "Cell cycle"
+        ]
+      },
+      "predicted_readouts": [
+        "Cell count (increase)",
+        "Ki-67 staining (immunofluorescence)",
+        "Cell cycle analysis (PI staining + flow cytometry)"
+      ],
+      "literature_support": {
+        "overall": "weak",
+        "supporting_papers": [],
+        "contradicting_papers": [],
+        "summary": "Weak or indirect evidence. Found 3 potentially relevant papers but limited direct support."
+      },
+      "experiments": [
+        "Perform KO TP53 in HepG2 cells and measure increased cell proliferation markers at 24h, 48h, and 72h post-perturbation"
+      ],
+      "speculation_notes": "Directly supported by 6 validated regulatory edges. Literature support: 3 relevant papers found."
+    },
+    {
+      "id": "H2",
+      "statement": "KO TP53 activates p53 signaling pathway, leading to neoplasia",
+      "mechanism": [
+        "Perturbation: KO TP53",
+        "Enriches pathway: p53 signaling pathway (NES=2.50, FDR=0.001)",
+        "Affects pathway genes: TP53, CDKN1A, BAX, MDM2, P21",
+        "Predicts phenotype: Neoplasia"
+      ],
+      "phenotype_support": {
+        "primary_phenotype": "Neoplasia",
+        "phenotype_id": "HP:0002664",
+        "score": 0.71,
+        "direction": "increase",
+        "supporting_pathways": [
+          "p53 signaling pathway"
+        ]
+      },
+      "predicted_readouts": [
+        "RNA-seq transcriptome profiling",
+        "Protein expression (Western blot or mass spectrometry)",
+        "Cell viability assay (MTT or CellTiter-Glo)"
+      ],
+      "literature_support": {
+        "overall": "weak",
+        "supporting_papers": [],
+        "contradicting_papers": [],
+        "summary": "Weak or indirect evidence. Found 3 potentially relevant papers but limited direct support."
+      },
+      "experiments": [
+        "Perform KO TP53 in HepG2 cells and perform pathway activity assay for p53 signaling pathway at 24h"
+      ],
+      "speculation_notes": "Directly supported by 6 validated regulatory edges. Literature support: 3 relevant papers found."
+    },
+    {
+      "id": "H3",
+      "statement": "KO TP53 inhibits Apoptosis, leading to increased apoptosis",
+      "mechanism": [
+        "Perturbation: KO TP53",
+        "Enriches pathway: Apoptosis (NES=-2.30, FDR=0.002)",
+        "Affects pathway genes: BAX, BCL2, CASP3, FAS",
+        "Predicts phenotype: Increased apoptosis"
+      ],
+      "phenotype_support": {
+        "primary_phenotype": "Increased apoptosis",
+        "phenotype_id": "HP:0001903",
+        "score": 0.75,
+        "direction": "increase",
+        "supporting_pathways": [
+          "Apoptosis"
+        ]
+      },
+      "predicted_readouts": [
+        "RNA-seq transcriptome profiling",
+        "Protein expression (Western blot or mass spectrometry)",
+        "Cell viability assay (MTT or CellTiter-Glo)"
+      ],
+      "literature_support": {
+        "overall": "weak",
+        "supporting_papers": [],
+        "contradicting_papers": [],
+        "summary": "Weak or indirect evidence. Found 3 potentially relevant papers but limited direct support."
+      },
+      "experiments": [
+        "Perform KO TP53 in HepG2 cells and perform pathway activity assay for Apoptosis at 24h"
+      ],
+      "speculation_notes": "Directly supported by 6 validated regulatory edges. Literature support: 3 relevant papers found."
+    },
+    {
+      "id": "H4",
+      "statement": "KO TP53 downregulates CDKN1A via TP53, leading to neoplasia",
+      "mechanism": [
+        "Perturbation: KO TP53",
+        "Directly affects TP53 \u2192 CDKN1A (down, confidence=0.85)",
+        "Propagates through pathway: p53 signaling pathway",
+        "Predicts phenotype: Neoplasia"
+      ],
+      "phenotype_support": {
+        "primary_phenotype": "Neoplasia",
+        "phenotype_id": "HP:0002664",
+        "score": 0.71,
+        "direction": "increase"
+      },
+      "predicted_readouts": [
+        "Expression of CDKN1A (qRT-PCR or RNA-seq)"
+      ],
+      "literature_support": {
+        "overall": "weak",
+        "supporting_papers": [],
+        "contradicting_papers": [],
+        "summary": "Weak or indirect evidence. Found 3 potentially relevant papers but limited direct support."
+      },
+      "experiments": [
+        "Validate TP53 \u2192 CDKN1A interaction using ChIP-seq or co-IP"
+      ],
+      "speculation_notes": "Directly supported by 1 validated regulatory edges. Literature support: 3 relevant papers found."
+    },
+    {
+      "id": "H5",
+      "statement": "KO TP53 downregulates BAX via TP53, leading to increased apoptosis",
+      "mechanism": [
+        "Perturbation: KO TP53",
+        "Directly affects TP53 \u2192 BAX (down, confidence=0.82)",
+        "Propagates through pathway: p53 signaling pathway",
+        "Predicts phenotype: Increased apoptosis"
+      ],
+      "phenotype_support": {
+        "primary_phenotype": "Increased apoptosis",
+        "phenotype_id": "HP:0001903",
+        "score": 0.75,
+        "direction": "increase"
+      },
+      "predicted_readouts": [
+        "Expression of BAX (qRT-PCR or RNA-seq)"
+      ],
+      "literature_support": {
+        "overall": "weak",
+        "supporting_papers": [],
+        "contradicting_papers": [],
+        "summary": "Weak or indirect evidence. Found 3 potentially relevant papers but limited direct support."
+      },
+      "experiments": [
+        "Validate TP53 \u2192 BAX interaction using ChIP-seq or co-IP"
+      ],
+      "speculation_notes": "Directly supported by 1 validated regulatory edges. Literature support: 3 relevant papers found."
+    }
+  ],
+  "summary": {
+    "n_hypotheses": 5,
+    "top_phenotype": "Increased cell proliferation",
+    "top_pathway": "p53 signaling pathway"
+  }
+}

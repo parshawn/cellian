@@ -1,0 +1,251 @@
+{
+  "hypotheses": [
+    {
+      "id": "H1",
+      "statement": "\"statement\": \"CHCHD2 perturbation by Dimethyl fumarate leads to decreased RFX5 expression, subsequently impairing downstream thyroid hormone signaling.\",",
+      "mechanism": [],
+      "phenotype_support": null,
+      "predicted_readouts": [
+        "RNA-seq transcriptome profiling",
+        "Protein expression (Western blot or mass spectrometry)",
+        "Cell viability assay"
+      ],
+      "literature_support": {
+        "overall": "weak",
+        "supporting_papers": [],
+        "supporting_papers_full": [
+          {
+            "title": "Placeholder result 1 for query: CHCHD2 vs [('Dimethyl fumarate', 5.0, 'uM')] perturbation Dimethyl fumarate",
+            "abstract": "Edison Scientific API not configured. Install edison-client with 'uv pip install edison-client' and configure EDISON_API_KEY in .env to enable literature search.",
+            "pmid": null,
+            "year": null,
+            "url": null,
+            "score": 0.5,
+            "authors": null,
+            "journal": null
+          },
+          {
+            "title": "Placeholder result 2 for query: CHCHD2 vs [('Dimethyl fumarate', 5.0, 'uM')] perturbation Dimethyl fumarate",
+            "abstract": "Edison Scientific API not configured. Install edison-client with 'uv pip install edison-client' and configure EDISON_API_KEY in .env to enable literature search.",
+            "pmid": null,
+            "year": null,
+            "url": null,
+            "score": 0.5,
+            "authors": null,
+            "journal": null
+          },
+          {
+            "title": "Placeholder result 3 for query: CHCHD2 vs [('Dimethyl fumarate', 5.0, 'uM')] perturbation Dimethyl fumarate",
+            "abstract": "Edison Scientific API not configured. Install edison-client with 'uv pip install edison-client' and configure EDISON_API_KEY in .env to enable literature search.",
+            "pmid": null,
+            "year": null,
+            "url": null,
+            "score": 0.5,
+            "authors": null,
+            "journal": null
+          }
+        ],
+        "contradicting_papers": [],
+        "summary": "Weak or indirect evidence. Found 3 potentially relevant papers but limited direct support."
+      },
+      "experiments": [
+        "Perform CHCHD2 vs [('Dimethyl fumarate', 5.0, 'uM')] in  cells and perform transcriptome profiling (RNA-seq) at 24h"
+      ],
+      "speculation_notes": "Literature support: 3 relevant papers found."
+    },
+    {
+      "id": "H2",
+      "statement": "\"statement\": \"CHCHD2 perturbation by Dimethyl fumarate activates Phospholipase D signaling, contributing to increased insulin signaling.\",",
+      "mechanism": [],
+      "phenotype_support": null,
+      "predicted_readouts": [
+        "RNA-seq transcriptome profiling",
+        "Protein expression (Western blot or mass spectrometry)",
+        "Cell viability assay"
+      ],
+      "literature_support": {
+        "overall": "weak",
+        "supporting_papers": [],
+        "supporting_papers_full": [
+          {
+            "title": "Placeholder result 1 for query: CHCHD2 vs [('Dimethyl fumarate', 5.0, 'uM')] perturbation Dimethyl fumarate",
+            "abstract": "Edison Scientific API not configured. Install edison-client with 'uv pip install edison-client' and configure EDISON_API_KEY in .env to enable literature search.",
+            "pmid": null,
+            "year": null,
+            "url": null,
+            "score": 0.5,
+            "authors": null,
+            "journal": null
+          },
+          {
+            "title": "Placeholder result 2 for query: CHCHD2 vs [('Dimethyl fumarate', 5.0, 'uM')] perturbation Dimethyl fumarate",
+            "abstract": "Edison Scientific API not configured. Install edison-client with 'uv pip install edison-client' and configure EDISON_API_KEY in .env to enable literature search.",
+            "pmid": null,
+            "year": null,
+            "url": null,
+            "score": 0.5,
+            "authors": null,
+            "journal": null
+          },
+          {
+            "title": "Placeholder result 3 for query: CHCHD2 vs [('Dimethyl fumarate', 5.0, 'uM')] perturbation Dimethyl fumarate",
+            "abstract": "Edison Scientific API not configured. Install edison-client with 'uv pip install edison-client' and configure EDISON_API_KEY in .env to enable literature search.",
+            "pmid": null,
+            "year": null,
+            "url": null,
+            "score": 0.5,
+            "authors": null,
+            "journal": null
+          }
+        ],
+        "contradicting_papers": [],
+        "summary": "Weak or indirect evidence. Found 3 potentially relevant papers but limited direct support."
+      },
+      "experiments": [
+        "Perform CHCHD2 vs [('Dimethyl fumarate', 5.0, 'uM')] in  cells and perform transcriptome profiling (RNA-seq) at 24h"
+      ],
+      "speculation_notes": "Literature support: 3 relevant papers found."
+    },
+    {
+      "id": "H3",
+      "statement": "\"statement\": \"Dimethyl fumarate treatment targeting CHCHD2 downregulates Wnt signaling, potentially inhibiting the pluripotency of stem cells.\",",
+      "mechanism": [],
+      "phenotype_support": null,
+      "predicted_readouts": [
+        "RNA-seq transcriptome profiling",
+        "Protein expression (Western blot or mass spectrometry)",
+        "Cell viability assay"
+      ],
+      "literature_support": {
+        "overall": "weak",
+        "supporting_papers": [],
+        "supporting_papers_full": [
+          {
+            "title": "Placeholder result 1 for query: CHCHD2 vs [('Dimethyl fumarate', 5.0, 'uM')] fumarate treatment targeting",
+            "abstract": "Edison Scientific API not configured. Install edison-client with 'uv pip install edison-client' and configure EDISON_API_KEY in .env to enable literature search.",
+            "pmid": null,
+            "year": null,
+            "url": null,
+            "score": 0.5,
+            "authors": null,
+            "journal": null
+          },
+          {
+            "title": "Placeholder result 2 for query: CHCHD2 vs [('Dimethyl fumarate', 5.0, 'uM')] fumarate treatment targeting",
+            "abstract": "Edison Scientific API not configured. Install edison-client with 'uv pip install edison-client' and configure EDISON_API_KEY in .env to enable literature search.",
+            "pmid": null,
+            "year": null,
+            "url": null,
+            "score": 0.5,
+            "authors": null,
+            "journal": null
+          },
+          {
+            "title": "Placeholder result 3 for query: CHCHD2 vs [('Dimethyl fumarate', 5.0, 'uM')] fumarate treatment targeting",
+            "abstract": "Edison Scientific API not configured. Install edison-client with 'uv pip install edison-client' and configure EDISON_API_KEY in .env to enable literature search.",
+            "pmid": null,
+            "year": null,
+            "url": null,
+            "score": 0.5,
+            "authors": null,
+            "journal": null
+          }
+        ],
+        "contradicting_papers": [],
+        "summary": "Weak or indirect evidence. Found 3 potentially relevant papers but limited direct support."
+      },
+      "experiments": [
+        "Perform CHCHD2 vs [('Dimethyl fumarate', 5.0, 'uM')] in  cells and perform transcriptome profiling (RNA-seq) at 24h"
+      ],
+      "speculation_notes": "Literature support: 3 relevant papers found."
+    },
+    {
+      "id": "H4",
+      "statement": "\"statement\": \"CHCHD2 perturbation by Dimethyl fumarate activates sphingolipid signaling to influence adrenergic signaling in cardiomyocytes, potentially affecting heart function.\",",
+      "mechanism": [],
+      "phenotype_support": null,
+      "predicted_readouts": [
+        "RNA-seq transcriptome profiling",
+        "Protein expression (Western blot or mass spectrometry)",
+        "Cell viability assay"
+      ],
+      "literature_support": {
+        "overall": "weak",
+        "supporting_papers": [],
+        "supporting_papers_full": [
+          {
+            "title": "Placeholder result 1 for query: CHCHD2 vs [('Dimethyl fumarate', 5.0, 'uM')] perturbation Dimethyl fumarate",
+            "abstract": "Edison Scientific API not configured. Install edison-client with 'uv pip install edison-client' and configure EDISON_API_KEY in .env to enable literature search.",
+            "pmid": null,
+            "year": null,
+            "url": null,
+            "score": 0.5,
+            "authors": null,
+            "journal": null
+          },
+          {
+            "title": "Placeholder result 2 for query: CHCHD2 vs [('Dimethyl fumarate', 5.0, 'uM')] perturbation Dimethyl fumarate",
+            "abstract": "Edison Scientific API not configured. Install edison-client with 'uv pip install edison-client' and configure EDISON_API_KEY in .env to enable literature search.",
+            "pmid": null,
+            "year": null,
+            "url": null,
+            "score": 0.5,
+            "authors": null,
+            "journal": null
+          },
+          {
+            "title": "Placeholder result 3 for query: CHCHD2 vs [('Dimethyl fumarate', 5.0, 'uM')] perturbation Dimethyl fumarate",
+            "abstract": "Edison Scientific API not configured. Install edison-client with 'uv pip install edison-client' and configure EDISON_API_KEY in .env to enable literature search.",
+            "pmid": null,
+            "year": null,
+            "url": null,
+            "score": 0.5,
+            "authors": null,
+            "journal": null
+          }
+        ],
+        "contradicting_papers": [],
+        "summary": "Weak or indirect evidence. Found 3 potentially relevant papers but limited direct support."
+      },
+      "experiments": [
+        "Perform CHCHD2 vs [('Dimethyl fumarate', 5.0, 'uM')] in  cells and perform transcriptome profiling (RNA-seq) at 24h"
+      ],
+      "speculation_notes": "Literature support: 3 relevant papers found."
+    }
+  ],
+  "summary": {
+    "n_hypotheses": 4,
+    "top_phenotype": null,
+    "top_pathway": "Wnt signaling pathway"
+  },
+  "llm_generated_hypotheses_before_literature": [
+    {
+      "statement": "\"statement\": \"CHCHD2 perturbation by Dimethyl fumarate leads to decreased RFX5 expression, subsequently impairing downstream thyroid hormone signaling.\",",
+      "mechanism": [],
+      "key_pathways": [],
+      "key_genes": [],
+      "literature_status": "pending"
+    },
+    {
+      "statement": "\"statement\": \"CHCHD2 perturbation by Dimethyl fumarate activates Phospholipase D signaling, contributing to increased insulin signaling.\",",
+      "mechanism": [],
+      "key_pathways": [],
+      "key_genes": [],
+      "literature_status": "pending"
+    },
+    {
+      "statement": "\"statement\": \"Dimethyl fumarate treatment targeting CHCHD2 downregulates Wnt signaling, potentially inhibiting the pluripotency of stem cells.\",",
+      "mechanism": [],
+      "key_pathways": [],
+      "key_genes": [],
+      "literature_status": "pending"
+    },
+    {
+      "statement": "\"statement\": \"CHCHD2 perturbation by Dimethyl fumarate activates sphingolipid signaling to influence adrenergic signaling in cardiomyocytes, potentially affecting heart function.\",",
+      "mechanism": [],
+      "key_pathways": [],
+      "key_genes": [],
+      "literature_status": "pending"
+    }
+  ]
+}

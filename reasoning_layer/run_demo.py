@@ -129,6 +129,33 @@ def print_results_summary(result):
             status_icon = "✓" if status == "ok" else "✗"
             print(f"     {status_icon} {name}")
     
+    # LLM Interpretation
+    if "llm_interpretation" in result:
+        llm_interp = result["llm_interpretation"]
+        if llm_interp:
+            print(f"\n🤖 LLM Interpretation:")
+            # Print first few lines of interpretation
+            lines = llm_interp.split('\n')
+            for line in lines[:10]:  # Show first 10 lines
+                if line.strip():
+                    print(f"   {line}")
+            if len(lines) > 10:
+                print(f"   ... ({len(lines) - 10} more lines)")
+    
+    # Graph info
+    if "graph" in result:
+        graph = result["graph"]
+        nodes_count = len(graph.get("nodes", []))
+        edges_count = len(graph.get("edges", []))
+        print(f"\n📊 Causal Graph:")
+        print(f"   Nodes: {nodes_count}, Edges: {edges_count}")
+        if nodes_count > 0:
+            print(f"   Graph type: {'Dummy graph' if any(n.get('metadata', {}).get('dummy') for n in graph.get('nodes', [])) else 'Pre-computed graph'}")
+        if "graph_filepath" in result:
+            print(f"   Saved to: {result['graph_filepath']}")
+        if "graph_viz_filepath" in result:
+            print(f"   Visualization: {result['graph_viz_filepath']}")
+    
     print("\n" + "=" * 80 + "\n")
 
 
@@ -184,6 +211,8 @@ Examples:
                        help="Load test sample from JSON file")
     parser.add_argument("--save-sample", type=str,
                        help="Save generated test sample to JSON file")
+    parser.add_argument("--dummy-graph", action="store_true",
+                       help="Create and include dummy graph in output")
     
     # Normal mode arguments
     parser.add_argument("--query", type=str, default="What happens if I knock out JAK1?",
@@ -208,9 +237,15 @@ Examples:
     # Build registry and register tools
     registry = ToolRegistry()
     
+    # Import pathway tools
+    from engine import tools_pathway
+    
     if args.test:
         # Test mode: use test tools that don't require DataLoader
         registry.register(tools_kg.kg_find_path)
+        registry.register(tools_pathway.pathway_find_affected)
+        registry.register(tools_pathway.pathway_get_genes)
+        registry.register(tools_pathway.pathway_traverse)
         registry.register(test_state_predict)  # Test-mode STATE tool
         registry.register(tools_captain.captain_translate)
         registry.register(tools_validate.validate_all)
@@ -218,6 +253,9 @@ Examples:
     else:
         # Normal mode: use real tools
         registry.register(tools_kg.kg_find_path)
+        registry.register(tools_pathway.pathway_find_affected)
+        registry.register(tools_pathway.pathway_get_genes)
+        registry.register(tools_pathway.pathway_traverse)
         registry.register(tools_state.state_predict)
         registry.register(tools_captain.captain_translate)
         registry.register(tools_validate.validate_all)
@@ -262,7 +300,8 @@ Examples:
         }
         
         # Create reasoner in test mode
-        reasoner = Reasoner(registry, planner, test_mode=True, test_data=test_data)
+        reasoner = Reasoner(registry, planner, test_mode=True, test_data=test_data, 
+                           use_dummy_graph=args.dummy_graph)
         
     else:
         # Normal mode: use hardcoded sample (requires real data)
@@ -285,7 +324,7 @@ Examples:
                 "obs_delta": {"HLA-A": -0.6, "CD58": -0.4}
             }
         }
-        reasoner = Reasoner(registry, planner)
+        reasoner = Reasoner(registry, planner, use_dummy_graph=args.dummy_graph)
     
     # Run reasoner
     query = args.query

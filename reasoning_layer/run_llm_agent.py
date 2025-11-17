@@ -45,8 +45,13 @@ def main():
         sys.exit(1)
     
     # Build registry and register tools
+    from engine import tools_pathway
+    
     registry = ToolRegistry()
     registry.register(tools_kg.kg_find_path)
+    registry.register(tools_pathway.pathway_find_affected)
+    registry.register(tools_pathway.pathway_get_genes)
+    registry.register(tools_pathway.pathway_traverse)
     registry.register(tools_state.state_predict)
     registry.register(tools_captain.captain_translate)
     registry.register(tools_validate.validate_all)

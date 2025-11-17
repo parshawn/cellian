@@ -82,6 +82,7 @@ python run_demo.py --test \
     --genes "STAT1,IRF1,CXCL10,HLA-A,B2M" \
     --proteins "HLA-A,CD58" \
     --seed 42 \
+    --dummy-graph \
     --output-file "results/test_demo_${SLURM_JOB_ID}.json" 
 
 EXIT_CODE=$?

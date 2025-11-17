@@ -24,24 +24,44 @@ Available tools:
 1. perturbation.get_embedding: Get pre-computed aligned perturbation embedding (Node 1)
    Args: {"perturbation_name": str}
    
-2. kg.find_path: Find signed paths source→targets in the KG
+2. pathway.find_affected: Find pathways affected by a perturbation
+   Args: {"perturbation": str, "max_hops": int}
+   Returns: pathway_ids, pathway_names, n_pathways
+   
+3. pathway.get_genes: Get all genes in specified pathways
+   Args: {"pathway_ids": [str]}
+   Returns: genes list, n_genes
+   
+4. pathway.traverse: Traverse pathway cascades from a starting gene
+   Args: {"start_gene": str, "pathway_id": str (optional), "max_hops": int}
+   Returns: genes list, paths
+   
+5. kg.find_path: Find signed paths source→targets in the KG
    Args: {"source": str, "targets": [str], "max_hops": int}
    
-3. state.predict: Predict ΔRNA for a perturbation in context (Node 2)
+6. state.predict: Predict ΔRNA for a perturbation in context (Node 2)
    Args: {"target": str, "context": {"cell_line": str, "condition": str}, "embedding": [float]}
    
-4. captain.translate: Translate ΔRNA to Δprotein on a panel (Node 3)
+7. captain.translate: Translate ΔRNA to Δprotein on a panel (Node 3)
    Args: {"delta_rna": {gene: float}, "panel": [str]}
    
-5. validate.all: Compute RNA/Protein metrics and edge-sign accuracy
+8. validate.all: Compute RNA/Protein metrics and edge-sign accuracy
    Args: {"pred_rna": {gene: float}, "obs_rna": {gene: float}, "pred_prot": {marker: float}, "obs_prot": {marker: float}, "path_edges": [{"src": str, "dst": str, "sign": "+"|"-"}, ...]}
 
-Policy: Execute tools in this order for the 3-node chain:
+Policy: For pathway-aware reasoning, execute tools in this order:
 1. perturbation.get_embedding (Node 1: get perturbation embedding)
-2. kg.find_path (optional: get knowledge graph paths)
-3. state.predict (Node 2: predict RNA changes from embedding)
-4. captain.translate (Node 3: translate RNA to protein)
-5. validate.all (compute validation metrics)
+2. pathway.find_affected (find affected pathways - recommended for comprehensive analysis)
+3. pathway.get_genes (get all genes in affected pathways - use pathway_ids from step 2)
+4. state.predict (Node 2: predict RNA changes - can use pathway genes from step 3)
+5. captain.translate (Node 3: translate RNA to protein)
+6. validate.all (compute validation metrics)
+   
+Alternative (simpler, without pathways):
+1. perturbation.get_embedding
+2. kg.find_path (optional)
+3. state.predict
+4. captain.translate
+5. validate.all
 
 Return a JSON object with:
 - "plan": [ordered list of tool names to execute]

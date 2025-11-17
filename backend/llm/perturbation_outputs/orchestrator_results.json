@@ -1,0 +1,36 @@
+{
+  "query": "Which one has teh most KO effect, is it Dimethyl fumarate or CHCHD2",
+  "intent": {
+    "mode": "comparison",
+    "gene_name": "CHCHD2",
+    "drug_name": "Dimethyl fumarate",
+    "has_comparison_phrase": true
+  },
+  "perturbations": [
+    {
+      "type": "gene",
+      "match_info": {
+        "requested_name": "CHCHD2",
+        "used_name": "CHCHD2",
+        "match_type": "exact",
+        "similarity_score": 1.0
+      },
+      "has_results": true,
+      "has_outputs": true,
+      "error": null
+    },
+    {
+      "type": "drug",
+      "match_info": {
+        "requested_name": "Dimethyl fumarate",
+        "used_name": "[('Dimethyl fumarate', 5.0, 'uM')]",
+        "match_type": "exact",
+        "similarity_score": 1.0
+      },
+      "has_results": true,
+      "has_outputs": true,
+      "error": null
+    }
+  ],
+  "has_comparison": true
+}

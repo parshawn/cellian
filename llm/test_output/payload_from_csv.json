@@ -1,0 +1,143 @@
+{
+  "context": {
+    "perturbation": "KO TP53",
+    "cell_type": "HepG2",
+    "species": "human",
+    "user_question": "What happens if I knock out TP53?"
+  },
+  "validated_edges": [],
+  "deg_list": [
+    {
+      "gene": "CDKN1A",
+      "log2fc": -2.5,
+      "pval": 0.001
+    },
+    {
+      "gene": "BAX",
+      "log2fc": -2.1,
+      "pval": 0.003
+    },
+    {
+      "gene": "MDM2",
+      "log2fc": -1.8,
+      "pval": 0.005
+    },
+    {
+      "gene": "P21",
+      "log2fc": -2.3,
+      "pval": 0.002
+    },
+    {
+      "gene": "CCND1",
+      "log2fc": 1.5,
+      "pval": 0.01
+    },
+    {
+      "gene": "CASP3",
+      "log2fc": -1.2,
+      "pval": 0.02
+    },
+    {
+      "gene": "BCL2",
+      "log2fc": 1.3,
+      "pval": 0.015
+    },
+    {
+      "gene": "PCNA",
+      "log2fc": 1.8,
+      "pval": 0.008
+    },
+    {
+      "gene": "GADD45A",
+      "log2fc": -1.5,
+      "pval": 0.012
+    },
+    {
+      "gene": "FAS",
+      "log2fc": -0.9,
+      "pval": 0.025
+    },
+    {
+      "gene": "MYC",
+      "log2fc": 1.2,
+      "pval": 0.018
+    },
+    {
+      "gene": "RB1",
+      "log2fc": -1.1,
+      "pval": 0.022
+    },
+    {
+      "gene": "ATM",
+      "log2fc": -0.8,
+      "pval": 0.03
+    },
+    {
+      "gene": "CHEK2",
+      "log2fc": -1.0,
+      "pval": 0.028
+    },
+    {
+      "gene": "PTEN",
+      "log2fc": -0.7,
+      "pval": 0.035
+    }
+  ],
+  "pathways": [
+    {
+      "id": "KEGG_P53_PATHWAY",
+      "name": "p53 signaling pathway",
+      "source": "GSEA",
+      "NES": 2.5,
+      "FDR": 0.001,
+      "member_genes": [
+        "TP53"
+      ]
+    },
+    {
+      "id": "KEGG_CELL_CYCLE",
+      "name": "Cell cycle",
+      "source": "GSEA",
+      "NES": 2.1,
+      "FDR": 0.003,
+      "member_genes": [
+        "CDKN1A"
+      ]
+    },
+    {
+      "id": "KEGG_APOPTOSIS",
+      "name": "Apoptosis",
+      "source": "GSEA",
+      "NES": -2.3,
+      "FDR": 0.002,
+      "member_genes": [
+        "BAX"
+      ]
+    },
+    {
+      "id": "KEGG_DNA_REPAIR",
+      "name": "DNA repair",
+      "source": "GSEA",
+      "NES": -1.8,
+      "FDR": 0.01,
+      "member_genes": [
+        "ATM"
+      ]
+    },
+    {
+      "id": "REACTOME_CELL_CYCLE_CHECKPOINTS",
+      "name": "Cell cycle checkpoints",
+      "source": "GSEA",
+      "NES": 1.9,
+      "FDR": 0.008,
+      "member_genes": [
+        "TP53"
+      ]
+    }
+  ],
+  "phenotypes": [],
+  "evidence": {
+    "datasets": [],
+    "papers": []
+  }
+}

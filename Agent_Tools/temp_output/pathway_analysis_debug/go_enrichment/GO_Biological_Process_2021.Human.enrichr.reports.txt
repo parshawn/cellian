@@ -1,0 +1,45 @@
+Gene_set	Term	Overlap	P-value	Adjusted P-value	Old P-value	Old Adjusted P-value	Odds Ratio	Combined Score	Genes
+GO_Biological_Process_2021	positive regulation of sterol transport (GO:0032373)	1/6	1.199524e-03	1.367532e-02	0	0	1.332733e+03	8.963738e+03	CETP
+GO_Biological_Process_2021	regulation of phospholipid transport (GO:2001138)	1/7	1.399341e-03	1.367532e-02	0	0	1.110556e+03	7.298298e+03	CETP
+GO_Biological_Process_2021	very-low-density lipoprotein particle remodeling (GO:0034372)	1/9	1.798886e-03	1.367532e-02	0	0	8.328333e+02	5.263996e+03	CETP
+GO_Biological_Process_2021	positive regulation of phospholipid transport (GO:2001140)	1/11	2.198311e-03	1.367532e-02	0	0	6.662000e+02	4.077188e+03	CETP
+GO_Biological_Process_2021	phospholipid homeostasis (GO:0055091)	1/12	2.397979e-03	1.367532e-02	0	0	6.056061e+02	3.653700e+03	CETP
+GO_Biological_Process_2021	triglyceride-rich lipoprotein particle remodeling (GO:0034370)	1/13	2.597617e-03	1.367532e-02	0	0	5.551111e+02	3.304666e+03	CETP
+GO_Biological_Process_2021	negative regulation of macrophage derived foam cell differentiation (GO:0010745)	1/13	2.597617e-03	1.367532e-02	0	0	5.551111e+02	3.304666e+03	CETP
+GO_Biological_Process_2021	positive regulation of lipid transport (GO:0032370)	1/13	2.597617e-03	1.367532e-02	0	0	5.551111e+02	3.304666e+03	CETP
+GO_Biological_Process_2021	low-density lipoprotein particle remodeling (GO:0034374)	1/14	2.797225e-03	1.367532e-02	0	0	5.123846e+02	3.012375e+03	CETP
+GO_Biological_Process_2021	reverse cholesterol transport (GO:0043691)	1/17	3.395869e-03	1.438143e-02	0	0	4.162500e+02	2.366463e+03	CETP
+GO_Biological_Process_2021	high-density lipoprotein particle remodeling (GO:0034375)	1/18	3.595358e-03	1.438143e-02	0	0	3.917451e+02	2.204785e+03	CETP
+GO_Biological_Process_2021	sterol transport (GO:0015918)	1/21	4.193643e-03	1.537669e-02	0	0	3.329333e+02	1.822539e+03	CETP
+GO_Biological_Process_2021	regulation of cholesterol transport (GO:0032374)	1/25	4.990939e-03	1.568581e-02	0	0	2.773889e+02	1.470198e+03	CETP
+GO_Biological_Process_2021	acylglycerol homeostasis (GO:0055090)	1/25	4.990939e-03	1.568581e-02	0	0	2.773889e+02	1.470198e+03	CETP
+GO_Biological_Process_2021	triglyceride homeostasis (GO:0070328)	1/31	6.185986e-03	1.609446e-02	0	0	2.218444e+02	1.128183e+03	CETP
+GO_Biological_Process_2021	regulation of macrophage derived foam cell differentiation (GO:0010743)	1/31	6.185986e-03	1.609446e-02	0	0	2.218444e+02	1.128183e+03	CETP
+GO_Biological_Process_2021	positive regulation of cholesterol transport (GO:0032376)	1/33	6.584096e-03	1.609446e-02	0	0	2.079583e+02	1.044595e+03	CETP
+GO_Biological_Process_2021	regulation of cholesterol efflux (GO:0010874)	1/33	6.584096e-03	1.609446e-02	0	0	2.079583e+02	1.044595e+03	CETP
+GO_Biological_Process_2021	acylglycerol metabolic process (GO:0006639)	1/41	8.175340e-03	1.893237e-02	0	0	1.663000e+02	7.993431e+02	CETP
+GO_Biological_Process_2021	secondary alcohol metabolic process (GO:1902652)	1/49	9.764672e-03	2.129120e-02	0	0	1.385278e+02	6.412429e+02	CETP
+GO_Biological_Process_2021	cholesterol transport (GO:0030301)	1/51	1.016171e-02	2.129120e-02	0	0	1.329733e+02	6.102318e+02	CETP
+GO_Biological_Process_2021	triglyceride metabolic process (GO:0006641)	1/55	1.095542e-02	2.191084e-02	0	0	1.230988e+02	5.556581e+02	CETP
+GO_Biological_Process_2021	lipid homeostasis (GO:0055088)	1/64	1.273952e-02	2.323246e-02	0	0	1.054656e+02	4.601513e+02	CETP
+GO_Biological_Process_2021	chemical homeostasis (GO:0048878)	1/65	1.293761e-02	2.323246e-02	0	0	1.038125e+02	4.513370e+02	CETP
+GO_Biological_Process_2021	sterol metabolic process (GO:0016125)	1/70	1.392759e-02	2.323246e-02	0	0	9.626570e+01	4.114284e+02	CETP
+GO_Biological_Process_2021	cholesterol homeostasis (GO:0042632)	1/71	1.412549e-02	2.323246e-02	0	0	9.488571e+01	4.041917e+02	CETP
+GO_Biological_Process_2021	sterol homeostasis (GO:0055092)	1/72	1.432337e-02	2.323246e-02	0	0	9.354460e+01	3.971775e+02	CETP
+GO_Biological_Process_2021	cholesterol metabolic process (GO:0008203)	1/77	1.531230e-02	2.323246e-02	0	0	8.736842e+01	3.651212e+02	CETP
+GO_Biological_Process_2021	phosphatidylcholine metabolic process (GO:0046470)	1/77	1.531230e-02	2.323246e-02	0	0	8.736842e+01	3.651212e+02	CETP
+GO_Biological_Process_2021	glycerophospholipid metabolic process (GO:0006650)	1/80	1.590531e-02	2.332779e-02	0	0	8.403797e+01	3.480099e+02	CETP
+GO_Biological_Process_2021	lipid transport (GO:0006869)	1/109	2.162388e-02	3.069196e-02	0	0	6.138272e+01	2.353387e+02	CETP
+GO_Biological_Process_2021	cellular response to molecule of bacterial origin (GO:0071219)	1/115	2.280392e-02	3.135539e-02	0	0	5.813450e+01	2.197963e+02	IL36G
+GO_Biological_Process_2021	cellular response to lipopolysaccharide (GO:0071222)	1/120	2.378647e-02	3.171529e-02	0	0	5.567787e+01	2.081594e+02	IL36G
+GO_Biological_Process_2021	organic substance transport (GO:0071702)	1/136	2.692564e-02	3.484494e-02	0	0	4.903951e+01	1.772619e+02	CETP
+GO_Biological_Process_2021	response to lipopolysaccharide (GO:0032496)	1/159	3.142493e-02	3.950563e-02	0	0	4.185232e+01	1.448155e+02	IL36G
+GO_Biological_Process_2021	negative regulation of cell differentiation (GO:0045596)	1/191	3.765884e-02	4.602747e-02	0	0	3.474737e+01	1.139431e+02	CETP
+GO_Biological_Process_2021	cellular response to lipid (GO:0071396)	1/219	4.308878e-02	5.124071e-02	0	0	3.024159e+01	9.509446e+01	IL36G
+GO_Biological_Process_2021	inflammatory response (GO:0006954)	1/230	4.521567e-02	5.235499e-02	0	0	2.877293e+01	8.908994e+01	IL36G
+GO_Biological_Process_2021	cellular response to oxygen-containing compound (GO:1901701)	1/323	6.305620e-02	7.114033e-02	0	0	2.036646e+01	5.628737e+01	IL36G
+GO_Biological_Process_2021	positive regulation of macromolecule metabolic process (GO:0010604)	1/384	7.462149e-02	8.208364e-02	0	0	1.706963e+01	4.430126e+01	IL36G
+GO_Biological_Process_2021	positive regulation of gene expression (GO:0010628)	1/482	9.297721e-02	9.740470e-02	0	0	1.352391e+01	3.212470e+01	IL36G
+GO_Biological_Process_2021	cellular response to cytokine stimulus (GO:0071345)	1/482	9.297721e-02	9.740470e-02	0	0	1.352391e+01	3.212470e+01	IL36G
+GO_Biological_Process_2021	cytokine-mediated signaling pathway (GO:0019221)	1/621	1.185423e-01	1.212991e-01	0	0	1.041720e+01	2.221453e+01	IL36G
+GO_Biological_Process_2021	regulation of gene expression (GO:0010468)	1/1079	1.989693e-01	1.989693e-01	0	0	5.849722e+00	9.444987e+00	IL36G

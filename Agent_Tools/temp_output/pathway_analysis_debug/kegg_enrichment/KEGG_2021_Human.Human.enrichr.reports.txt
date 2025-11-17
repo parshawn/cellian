@@ -1,0 +1,3 @@
+Gene_set	Term	Overlap	P-value	Adjusted P-value	Old P-value	Old Adjusted P-value	Odds Ratio	Combined Score	Genes
+KEGG_2021_Human	Cholesterol metabolism	1/50	9.963204e-03	1.992641e-02	0	0	1.356939e+02	6.253936e+02	CETP
+KEGG_2021_Human	Cytokine-cytokine receptor interaction	1/295	5.771140e-02	5.771140e-02	0	0	2.233787e+01	6.371432e+01	IL36G

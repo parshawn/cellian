@@ -117,6 +117,7 @@ class WorkflowStatus(BaseModel):
     error: Optional[str] = None
     logs: Optional[List[Dict[str, Any]]] = None
     pipeline_stage: Optional[str] = None  # "perturbation", "rna", "protein", "analysis"
+    current_perturbation_type: Optional[str] = None  # "gene", "drug", "both"
 
 
 # In-memory storage for workflow status
@@ -171,7 +172,8 @@ async def start_workflow(request: PerturbationRequest, background_tasks: Backgro
         current_step="Initializing",
         progress=0.0,
         logs=[],
-        pipeline_stage="perturbation"
+        pipeline_stage="perturbation",
+        current_perturbation_type=None
     )
     workflow_logs[workflow_id] = []
     
@@ -226,8 +228,9 @@ async def stream_workflow_results(workflow_id: str):
                 "progress": status.progress,
                 "results": serializable_results,
                 "error": status.error,
-                "logs": _filter_important_logs(logs[-100:]),  # Filter to important logs only
-                "pipeline_stage": status.pipeline_stage
+                "logs": _get_summary_logs(logs),  # Send only summary logs to frontend
+                "pipeline_stage": status.pipeline_stage,
+                "current_perturbation_type": status.current_perturbation_type
             }
             yield f"data: {json.dumps(data, default=str)}\n\n"
             
@@ -288,10 +291,102 @@ def _make_json_serializable(obj: Any) -> Any:
         return str(obj)
 
 
+def _get_summary_logs(logs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Extract only major step summary logs for frontend display.
+    Major steps: data preprocessing, state inference, protein preprocessing, 
+    scTranslator inference, DEA, pathway analysis.
+    """
+    summary_logs = []
+    seen_steps = set()
+    
+    # Keywords for major steps
+    step_keywords = {
+        "data_preprocessing": ["preparing", "preprocessing", "loading data", "preparing data"],
+        "state_inference": ["state inference", "running state", "rna prediction", "rna predict"],
+        "protein_preprocessing": ["preparing protein", "protein preprocessing", "protein data"],
+        "sctranslator_inference": ["sctranslator", "protein prediction", "protein predict", "translating"],
+        "dea": ["differential expression", "dea", "calculating differential"],
+        "pathway_analysis": ["pathway", "gsea", "enrichment", "pathway enrichment"]
+    }
+    
+    for log in logs:
+        msg = log.get("message", "").lower()
+        log_type = log.get("type", "")
+        
+        # Always include INIT, PLAN, RESULT, ERROR types (they're already summaries)
+        if log_type in ["INIT", "PLAN", "RESULT", "ERROR"]:
+            # Check if we've seen this exact message before (avoid duplicates)
+            msg_key = f"{log_type}:{msg[:50]}"
+            if msg_key not in seen_steps:
+                summary_logs.append(log)
+                seen_steps.add(msg_key)
+        else:
+            # For other logs, check if they match major step keywords
+            for step_name, keywords in step_keywords.items():
+                if any(keyword in msg for keyword in keywords):
+                    msg_key = f"{step_name}:{msg[:50]}"
+                    if msg_key not in seen_steps:
+                        # Create a summary log entry
+                        summary_msg = _create_summary_message(msg, step_name)
+                        summary_logs.append({
+                            "type": log_type if log_type in ["MODEL", "COMPUTE"] else "INFO",
+                            "message": summary_msg,
+                            "timestamp": log.get("timestamp")
+                        })
+                        seen_steps.add(msg_key)
+                        break
+    
+    return summary_logs[-20:]  # Return last 20 summary logs
+
+
+def _create_summary_message(original_msg: str, step_type: str) -> str:
+    """Create a concise 1-2 sentence summary for a major step."""
+    msg_lower = original_msg.lower()
+    
+    if step_type == "data_preprocessing":
+        if "gene" in msg_lower:
+            return "Preprocessing gene perturbation data for analysis."
+        elif "drug" in msg_lower:
+            return "Preprocessing drug perturbation data for analysis."
+        return "Preprocessing perturbation data for analysis."
+    
+    elif step_type == "state_inference":
+        if "gene" in msg_lower:
+            return "Running STATE model inference to predict RNA changes from gene perturbation."
+        elif "drug" in msg_lower:
+            return "Running STATE model inference to predict RNA changes from drug perturbation."
+        return "Running STATE model inference to predict RNA changes."
+    
+    elif step_type == "protein_preprocessing":
+        return "Preprocessing protein data for scTranslator inference."
+    
+    elif step_type == "sctranslator_inference":
+        return "Running scTranslator inference to translate RNA predictions to protein changes."
+    
+    elif step_type == "dea":
+        if "rna" in msg_lower:
+            return "Calculating differential expression analysis for RNA data."
+        elif "protein" in msg_lower:
+            return "Calculating differential expression analysis for protein data."
+        return "Calculating differential expression analysis."
+    
+    elif step_type == "pathway_analysis":
+        if "gsea" in msg_lower or "gene set" in msg_lower:
+            return "Performing Gene Set Enrichment Analysis (GSEA) to identify enriched pathways."
+        return "Performing pathway enrichment analysis to identify biological pathways."
+    
+    # Fallback: return first sentence or first 100 chars
+    sentences = original_msg.split('.')
+    if len(sentences) > 0 and sentences[0]:
+        return sentences[0].strip() + "."
+    return original_msg[:100] + "..." if len(original_msg) > 100 else original_msg
+
+
 def _filter_important_logs(logs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Filter logs to only show important ones."""
     important_keywords = [
-        "INIT", "MODEL", "COMPUTE", "RESULT", "ERROR",
+        "INIT", "MODEL", "COMPUTE", "RESULT", "ERROR", "PLAN",
         "RNA PREDICT", "PROTEIN PREDICT", "PATHWAY",
         "STATE", "SCTRANSLATOR", "COMPLETED", "STARTED",
         "Loading", "Running", "Finished", "Error", "Warning"
@@ -303,19 +398,20 @@ def _filter_important_logs(logs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         log_type = log.get("type", "")
         
         # Keep if it's an important type or contains important keywords
-        if log_type in ["INIT", "MODEL", "COMPUTE", "RESULT", "ERROR"]:
+        if log_type in ["INIT", "MODEL", "COMPUTE", "RESULT", "ERROR", "PLAN", "INJECT", "VALIDATE"]:
             filtered.append(log)
         elif any(keyword in msg for keyword in important_keywords):
             filtered.append(log)
         # Skip verbose/debug logs
-        elif any(skip in msg for skip in ["DEBUG", "TRACE", "VERBOSE", "INFO:"]):
+        elif any(skip in msg for skip in ["DEBUG", "TRACE", "VERBOSE"]):
             continue
         else:
             # Keep first and last few logs for context
-            if len(filtered) < 3 or len(logs) - len(filtered) < 3:
+            if len(filtered) < 5 or len(logs) - len(filtered) < 5:
                 filtered.append(log)
     
-    return filtered[:30]  # Limit to 30 most important logs
+    # Return all filtered logs (increased limit to 100 to show more context)
+    return filtered[:100]  # Limit to 100 most important logs
 
 
 def parse_log_line(line: str) -> Optional[Dict[str, Any]]:
@@ -396,15 +492,73 @@ async def run_workflow_background(
                 # Update status logs field
                 status.logs = logs[-50:]
         
-        # Add initial log
-        add_log({"type": "INIT", "message": f"Initializing Multi-Omics Hypothesis Engine for {perturbation_type} perturbation"})
+        def _normalize_entries(value: Any):
+            if isinstance(value, list):
+                return value
+            if isinstance(value, dict):
+                return list(value.values())
+            return []
         
-        status.status = "running"
-        status.current_step = "Preparing perturbation data"
-        status.progress = 0.1
-        status.pipeline_stage = "perturbation"
+        def add_result_summaries(results_obj: Optional[Dict[str, Any]]):
+            """Add summary logs for key outputs so frontend logs reflect final dashboards."""
+            if not results_obj:
+                return
+            
+            pathway_analysis = results_obj.get("pathway_analysis") or {}
+            
+            differential_rna = _normalize_entries(pathway_analysis.get("differential_rna"))
+            if differential_rna:
+                top_genes = [
+                    row.get("gene") or row.get("Gene") or row.get("index")
+                    for row in differential_rna
+                    if row.get("gene") or row.get("Gene") or row.get("index")
+                ]
+                if top_genes:
+                    add_log({
+                        "type": "RESULT",
+                        "message": f"RNA differential expression ready ({len(differential_rna)} genes). Top hits: {', '.join(top_genes[:5])}"
+                    })
+            
+            differential_protein = _normalize_entries(pathway_analysis.get("differential_protein"))
+            if differential_protein:
+                top_proteins = [
+                    row.get("gene") or row.get("protein") or row.get("index")
+                    for row in differential_protein
+                    if row.get("gene") or row.get("protein") or row.get("index")
+                ]
+                if top_proteins:
+                    add_log({
+                        "type": "RESULT",
+                        "message": f"Protein differential expression ready ({len(differential_protein)} markers). Top hits: {', '.join(top_proteins[:5])}"
+                    })
+            
+            gsea_rna = _normalize_entries(pathway_analysis.get("gsea_rna"))
+            if gsea_rna:
+                top_pathways = [
+                    entry.get("name") or entry.get("pathway_name") or entry.get("pathway") or entry.get("id")
+                    for entry in gsea_rna
+                    if entry.get("name") or entry.get("pathway_name") or entry.get("pathway") or entry.get("id")
+                ]
+                if top_pathways:
+                    add_log({
+                        "type": "RESULT",
+                        "message": f"Top RNA pathways: {', '.join(top_pathways[:3])}"
+                    })
+            
+            gsea_protein = _normalize_entries(pathway_analysis.get("gsea_protein"))
+            if gsea_protein:
+                top_protein_pathways = [
+                    entry.get("name") or entry.get("pathway_name") or entry.get("pathway") or entry.get("id")
+                    for entry in gsea_protein
+                    if entry.get("name") or entry.get("pathway_name") or entry.get("pathway") or entry.get("id")
+                ]
+                if top_protein_pathways:
+                    add_log({
+                        "type": "RESULT",
+                        "message": f"Top protein pathways: {', '.join(top_protein_pathways[:3])}"
+                    })
         
-        # Extract target from perturbation_info (from LLM)
+        # Extract target from perturbation_info (from LLM) FIRST - before using them
         target = perturbation_info.get("target", "")
         target2 = perturbation_info.get("target2", "")
         has_both = perturbation_info.get("has_both", False)
@@ -415,6 +569,25 @@ async def run_workflow_background(
         
         if not target:
             raise ValueError("No target specified in perturbation_info")
+        
+        # Add initial log
+        # Determine actual perturbation type from LLM info, not frontend parameter
+        # Frontend parameter is just a hint - we use LLM types as source of truth
+        actual_pert_type = perturbation_type  # Default to frontend hint
+        if has_both and target2:
+            actual_pert_type = "both"
+        elif pert_type == "drug":
+            actual_pert_type = "drug"
+        elif pert_type in ["KO", "KD", "OE"]:
+            actual_pert_type = "gene"
+        
+        add_log({"type": "INIT", "message": f"Initializing Multi-Omics Hypothesis Engine for {actual_pert_type} perturbation"})
+        
+        status.status = "running"
+        status.current_step = "Preparing perturbation data"
+        status.progress = 0.1
+        status.pipeline_stage = "perturbation"
+        status.current_perturbation_type = actual_pert_type
         
         # Prepare output directory
         output_dir = backend_dir / "Agent_Tools" / "temp_output"
@@ -447,32 +620,17 @@ async def run_workflow_background(
         log_fp.write(f"{'='*80}\n\n")
         log_fp.flush()
         
-        # Always check for both perturbations: if target2 exists, validate if it's gene+drug
-        auto_detected = False
-        if target2:
-            # Check if one looks like a gene (uppercase, short) and one looks like a drug (lowercase, longer, or multi-word)
-            is_gene_like = target and len(target) <= 10 and target[0].isupper() and target.isupper()
-            is_drug_like = target2 and (target2[0].islower() or len(target2.split()) > 1 or " " in target2)
-            if is_gene_like and is_drug_like:
-                has_both = True
-                auto_detected = True
-                log_fp.write(f"  [AUTO-DETECT] Both perturbations detected: {target} (gene-like) + {target2} (drug-like)\n")
-                log_fp.write(f"  [AUTO-DETECT] Setting has_both=True (overriding LLM value: {perturbation_info.get('has_both', False)})\n")
-                log_fp.flush()
-            elif has_both:
-                # LLM said has_both=True, validate it
-                log_fp.write(f"  [VALIDATE] LLM set has_both=True, target2 exists: {target2}\n")
-                log_fp.write(f"  [VALIDATE] Keeping has_both=True from LLM\n")
-                log_fp.flush()
-            else:
-                # target2 exists but doesn't look like gene+drug, or both are same type
-                log_fp.write(f"  [INFO] target2 exists ({target2}) but not detected as gene+drug combination\n")
-                log_fp.write(f"  [INFO] Keeping has_both=False\n")
-                log_fp.flush()
-        elif has_both:
+        # Trust LLM's has_both value - don't override with auto-detection
+        # Only validate that if has_both=True, we have target2
+        if has_both and not target2:
             # LLM said has_both=True but no target2 - invalid
             log_fp.write(f"  [WARNING] LLM set has_both=True but target2 is missing. Setting has_both=False.\n")
             has_both = False
+            log_fp.flush()
+        elif has_both and target2:
+            # LLM said has_both=True and we have target2 - trust it
+            log_fp.write(f"  [INFO] Using LLM result: has_both=True, target={target}, target2={target2}\n")
+            log_fp.write(f"  [INFO] LLM types: type={pert_type}, type2={pert_type2}\n")
             log_fp.flush()
         
         # Enhanced logging to show final perturbation detection
@@ -485,12 +643,10 @@ async def run_workflow_background(
             log_fp.write(f"Secondary Target: {target2}\n")
             log_fp.write(f"Secondary Type: {pert_type2}\n")
         log_fp.write(f"Has Both (Final): {has_both}\n")
-        if auto_detected:
-            log_fp.write(f"  → Auto-detection set has_both=True (gene+drug pattern detected)\n")
-        elif has_both:
-            log_fp.write(f"  → Using LLM result (has_both=True validated)\n")
+        if has_both:
+            log_fp.write(f"  → Using LLM result (has_both=True)\n")
         else:
-            log_fp.write(f"  → Single perturbation (no target2 or not gene+drug pattern)\n")
+            log_fp.write(f"  → Single perturbation (no target2 or has_both=False)\n")
         log_fp.write(f"Condition: {condition}\n")
         log_fp.write(f"Perturbation Type (pipeline): {perturbation_type}\n")
         log_fp.write(f"{'='*80}\n\n")
@@ -500,8 +656,26 @@ async def run_workflow_background(
         
         # Log both perturbations if has_both is true
         if has_both and target2:
-            source = "LLM" if not auto_detected else "auto-detection"
-            add_log({"type": "INIT", "message": f"✅ BOTH perturbations detected ({source}): Gene={target}, Drug={target2}, Condition={condition}"})
+            # Determine gene and drug for logging based on LLM types (same logic as execution)
+            # Check for "drug" type FIRST - this is the most reliable indicator
+            if pert_type == "drug":
+                gene_name = target2
+                drug_name = target
+            elif pert_type2 == "drug":
+                gene_name = target
+                drug_name = target2
+            # Then check for explicit gene types
+            elif pert_type in ["KO", "KD", "OE"]:
+                gene_name = target
+                drug_name = target2
+            elif pert_type2 in ["KO", "KD", "OE"]:
+                gene_name = target2
+                drug_name = target
+            else:
+                # Fallback for logging
+                gene_name = target if (target and len(target) <= 10 and target.isupper()) else target2
+                drug_name = target2 if gene_name == target else target
+            add_log({"type": "INIT", "message": f"✅ BOTH perturbations detected (LLM): Gene={gene_name}, Drug={drug_name}, Condition={condition}"})
         else:
             # Don't show type if it's "unknown"
             type_str = f" ({pert_type})" if pert_type and pert_type != "unknown" else ""
@@ -519,12 +693,78 @@ async def run_workflow_background(
         
         # Check if we need to run both perturbations
         if has_both and target2:
+            # Determine which is gene and which is drug based on LLM type information ONLY
+            # Trust the LLM's type and type2 fields - don't use fallback pattern matching
+            gene_target = None
+            drug_target = None
+            gene_type = None
+            
+            # Check LLM type information first - this is the source of truth
+            # Log what we're checking for debugging
+            log_fp.write(f"  [DEBUG] Determining gene vs drug from LLM types:\n")
+            log_fp.write(f"    target={target}, pert_type={pert_type}\n")
+            log_fp.write(f"    target2={target2}, pert_type2={pert_type2}\n")
+            log_fp.flush()
+            
+            if pert_type == "drug":
+                # target is drug, so target2 must be gene
+                drug_target = target
+                gene_target = target2
+                gene_type = pert_type2 if pert_type2 in ["KO", "KD", "OE"] else "KO"
+                log_fp.write(f"  [DEBUG] Matched: pert_type == 'drug' -> gene={gene_target}, drug={drug_target}\n")
+            elif pert_type2 == "drug":
+                # target2 is drug, so target must be gene
+                drug_target = target2
+                gene_target = target
+                gene_type = pert_type if pert_type in ["KO", "KD", "OE"] else "KO"
+                log_fp.write(f"  [DEBUG] Matched: pert_type2 == 'drug' -> gene={gene_target}, drug={drug_target}, gene_type={gene_type}\n")
+            elif pert_type in ["KO", "KD", "OE"]:
+                # target is gene (has explicit gene perturbation type)
+                gene_target = target
+                gene_type = pert_type
+                drug_target = target2
+                log_fp.write(f"  [DEBUG] Matched: pert_type in [KO,KD,OE] -> gene={gene_target}, drug={drug_target}\n")
+            elif pert_type2 in ["KO", "KD", "OE"]:
+                # target2 is gene (has explicit gene perturbation type)
+                gene_target = target2
+                gene_type = pert_type2
+                drug_target = target
+                log_fp.write(f"  [DEBUG] Matched: pert_type2 in [KO,KD,OE] -> gene={gene_target}, drug={drug_target}\n")
+            else:
+                # LLM didn't provide clear type info - log warning but use pattern matching as last resort
+                log_fp.write(f"  [DEBUG] No explicit type match, using fallback\n")
+                log_fp.write(f"  [WARNING] LLM types unclear: type={pert_type}, type2={pert_type2}\n")
+                log_fp.write(f"  [WARNING] Using pattern matching fallback\n")
+                log_fp.flush()
+                is_target_gene = target and len(target) <= 10 and target.isupper()
+                is_target2_gene = target2 and len(target2) <= 10 and target2.isupper()
+                if is_target_gene and not is_target2_gene:
+                    gene_target = target
+                    gene_type = "KO"
+                    drug_target = target2
+                elif is_target2_gene and not is_target_gene:
+                    gene_target = target2
+                    gene_type = "KO"
+                    drug_target = target
+                else:
+                    # Last resort: assume first is gene (shouldn't happen with good LLM)
+                    log_fp.write(f"  [ERROR] Cannot determine gene vs drug - using target as gene\n")
+                    log_fp.flush()
+                    gene_target = target
+                    gene_type = "KO"
+                    drug_target = target2
+            
+            # Verify we have the correct assignments
+            log_fp.write(f"  [DEBUG] Final assignments: gene_target={gene_target}, drug_target={drug_target}, gene_type={gene_type}\n")
+            log_fp.flush()
+            
             # Run gene perturbation first
-            add_log({"type": "PLAN", "message": f"🚀 Running BOTH perturbations sequentially: Gene={target} ({pert_type}), Drug={target2} ({pert_type2})"})
+            add_log({"type": "PLAN", "message": f"🚀 Running BOTH perturbations sequentially: Gene={gene_target} ({gene_type}), Drug={drug_target}"})
             
             # First: Gene perturbation
-            add_log({"type": "INIT", "message": f"Step 1/2: Running gene perturbation for {target} ({pert_type})"})
-            cmd_gene = ["python", str(pipeline_script), "--target-gene", target, "--output-dir", str(output_dir)]
+            status.current_perturbation_type = "gene"
+            add_log({"type": "INIT", "message": f"Step 1/2: Running gene perturbation for {gene_target} ({gene_type})"})
+            cmd_gene = ["python", str(pipeline_script), "--target-gene", gene_target, "--output-dir", str(output_dir)]
             stdin_input_gene = f"1\n{condition_choice}\n"
             
             # Run gene perturbation
@@ -559,6 +799,15 @@ async def run_workflow_background(
                             log_entry = parse_log_line(line)
                             if log_entry:
                                 add_log(log_entry)
+                                
+                                # Update pipeline stage based on log content
+                                line_upper = line.upper()
+                                if ("RNA" in line_upper and "PREDICT" in line_upper) or ("STATE" in line_upper and "INFERENCE" in line_upper):
+                                    status.pipeline_stage = "rna"
+                                elif ("PROTEIN" in line_upper and "PREDICT" in line_upper) or ("SCTRANSLATOR" in line_upper and "INFERENCE" in line_upper):
+                                    status.pipeline_stage = "protein"
+                                elif "PATHWAY" in line_upper or "DIFFERENTIAL" in line_upper or "GSEA" in line_upper:
+                                    status.pipeline_stage = "analysis"
             
             await process_gene.wait()
             if process_gene.returncode != 0:
@@ -568,15 +817,16 @@ async def run_workflow_background(
             
             log_fp.write(f"\n{'='*80}\n")
             log_fp.write("Step 2/2: Drug Perturbation\n")
-            log_fp.write(f"  Target: {target2}\n")
-            log_fp.write(f"  Type: {pert_type2}\n")
+            log_fp.write(f"  Target: {drug_target}\n")
+            log_fp.write(f"  Type: drug\n")
             log_fp.write(f"  Condition: {condition}\n")
             log_fp.write(f"{'='*80}\n\n")
             log_fp.flush()
             
             # Second: Drug perturbation
-            add_log({"type": "INIT", "message": f"Step 2/2: Running drug perturbation for {target2} ({pert_type2})"})
-            cmd_drug = ["python", str(pipeline_script), "--drug", target2, "--perturbation-type", "drug", "--output-dir", str(output_dir)]
+            status.current_perturbation_type = "drug"
+            add_log({"type": "INIT", "message": f"Step 2/2: Running drug perturbation for {drug_target}"})
+            cmd_drug = ["python", str(pipeline_script), "--drug", drug_target, "--perturbation-type", "drug", "--output-dir", str(output_dir)]
             stdin_input_drug = f"2\n{condition_choice}\n"
             
             # Run drug perturbation
@@ -611,6 +861,15 @@ async def run_workflow_background(
                             log_entry = parse_log_line(line)
                             if log_entry:
                                 add_log(log_entry)
+                                
+                                # Update pipeline stage based on log content
+                                line_upper = line.upper()
+                                if ("RNA" in line_upper and "PREDICT" in line_upper) or ("STATE" in line_upper and "INFERENCE" in line_upper):
+                                    status.pipeline_stage = "rna"
+                                elif ("PROTEIN" in line_upper and "PREDICT" in line_upper) or ("SCTRANSLATOR" in line_upper and "INFERENCE" in line_upper):
+                                    status.pipeline_stage = "protein"
+                                elif "PATHWAY" in line_upper or "DIFFERENTIAL" in line_upper or "GSEA" in line_upper:
+                                    status.pipeline_stage = "analysis"
             
             await process_drug.wait()
             if process_drug.returncode != 0:
@@ -628,21 +887,21 @@ async def run_workflow_background(
                     log_fp.write(f"\n{'='*80}\n")
                     log_fp.write("Collecting results from pipeline output (both perturbations)...\n")
                     log_fp.write(f"Output directory: {output_dir}\n")
-                    log_fp.write(f"Target 1 (Gene): {target}\n")
-                    log_fp.write(f"Target 2 (Drug): {target2}\n")
+                    log_fp.write(f"Gene Target: {gene_target}\n")
+                    log_fp.write(f"Drug Target: {drug_target}\n")
                     log_fp.flush()
                     
                     # Collect results - will include both if files exist
                     results = collect_results_from_pipeline(
                         str(output_dir),
-                        target  # Primary target
+                        gene_target  # Gene target
                     )
                     
                     # Also try to collect drug results if separate files exist
                     try:
                         drug_results = collect_results_from_pipeline(
                             str(output_dir),
-                            target2  # Drug target
+                            drug_target  # Drug target
                         )
                         # Merge drug results if available
                         if drug_results and "pathway_analysis" in drug_results:
@@ -675,6 +934,9 @@ async def run_workflow_background(
             status.status = "completed"
             status.progress = 1.0
             status.current_step = "Both perturbations completed successfully"
+            status.results = results
+            status.pipeline_stage = "completed"
+            add_result_summaries(results)
             
             # Close log file
             try:
@@ -686,10 +948,9 @@ async def run_workflow_background(
             except:
                 pass
             
-            # Skip the single perturbation code below
-            process = None
-            stdin_input = ""
-            return_code = 0  # Both processes completed successfully
+            # Return early - both perturbations are complete, skip single perturbation code
+            add_log({"type": "RESULT", "message": "Hypothesis generation complete. All analyses finished successfully."})
+            return
         else:
             # Single perturbation (original code)
             log_fp.write(f"\n{'='*80}\n")
@@ -720,146 +981,148 @@ async def run_workflow_background(
                 stdin_input = f"1\n{condition_choice}\n"
             else:
                 stdin_input = f"2\n{condition_choice}\n"
-        
-        # Update pipeline stage based on progress
-        status.pipeline_stage = "perturbation"
-        status.progress = 0.3
-        
-        # Run pipeline with real-time output capture
-        status.current_step = "Executing perturbation → RNA → Protein pipeline"
-        
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
-            cwd=str(backend_dir / "Agent_Tools")
-        )
-        
-        # Send stdin input
-        if process.stdin:
-            process.stdin.write(stdin_input.encode())
-            process.stdin.close()
-        
-        # Read output line by line in real-time
-        if process.stdout:
-            buffer = ""
-            while True:
-                chunk = await process.stdout.read(1024)
-                if not chunk:
-                    break
-                
-                buffer += chunk.decode('utf-8', errors='ignore')
-                
-                # Write raw output to log file
-                try:
-                    log_fp.write(chunk.decode('utf-8', errors='ignore'))
-                    log_fp.flush()
-                except:
-                    pass
-                
-                # Process complete lines
-                while '\n' in buffer:
-                    line, buffer = buffer.split('\n', 1)
-                    if line.strip():
-                        log_entry = parse_log_line(line)
-                        if log_entry:
-                            add_log(log_entry)
-                            
-                            # Update progress and pipeline stage based on log content
-                            line_upper = line.upper()
-                            
-                            # Stage 1: Perturbation → RNA
-                            if ("RNA" in line_upper and "PREDICT" in line_upper) or ("STATE" in line_upper and "INFERENCE" in line_upper):
-                                status.pipeline_stage = "rna"
-                                status.progress = min(0.5, status.progress + 0.1)
-                                add_log({"type": "MODEL", "message": "RNA prediction in progress..."})
-                            
-                            # Stage 2: RNA → Protein
-                            elif ("PROTEIN" in line_upper and "PREDICT" in line_upper) or ("SCTRANSLATOR" in line_upper and "INFERENCE" in line_upper):
-                                status.pipeline_stage = "protein"
-                                status.progress = min(0.7, status.progress + 0.1)
-                                add_log({"type": "MODEL", "message": "Protein prediction in progress..."})
-                            
-                            # Stage 3: Pathway Analysis
-                            elif "PATHWAY" in line_upper or "DIFFERENTIAL" in line_upper or "GSEA" in line_upper:
-                                status.pipeline_stage = "analysis"
-                                status.progress = min(0.85, status.progress + 0.05)
-                                add_log({"type": "COMPUTE", "message": "Pathway analysis in progress..."})
-                                # Don't collect results here - wait until end to avoid repeated calls
             
-            # Process remaining buffer
-            if buffer.strip():
-                try:
-                    log_fp.write(buffer)
-                    log_fp.flush()
-                except:
-                    pass
-                log_entry = parse_log_line(buffer)
-                if log_entry:
-                    add_log(log_entry)
+            # Update pipeline stage based on progress
+            status.pipeline_stage = "perturbation"
+            status.progress = 0.3
             
-            # Process remaining buffer
-            if buffer.strip():
-                try:
-                    log_fp.write(buffer)
-                    log_fp.flush()
-                except:
-                    pass
-        
-        # Wait for process to complete
-        return_code = await process.wait()
-        
-        # Log completion status
-        try:
-            log_fp.write(f"\n{'='*80}\n")
-            log_fp.write(f"Process completed with return code: {return_code}\n")
-            log_fp.flush()
-        except:
-            pass
-        
-        if return_code != 0:
-            error_msg = f"Pipeline failed with return code {return_code}"
-            add_log({"type": "ERROR", "message": error_msg})
-            raise RuntimeError(error_msg)
-        
-        status.current_step = "Processing results"
-        status.progress = 0.85
-        status.pipeline_stage = "analysis"
-        add_log({"type": "COMPUTE", "message": "Collecting results from pipeline output"})
-        
-        # Collect results from output directory
-        if LLM_AVAILABLE:
+            # Run pipeline with real-time output capture
+            status.current_step = "Executing perturbation → RNA → Protein pipeline"
+            
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+                cwd=str(backend_dir / "Agent_Tools")
+            )
+            
+            # Send stdin input
+            if process.stdin:
+                process.stdin.write(stdin_input.encode())
+                process.stdin.close()
+            
+            # Read output line by line in real-time
+            if process.stdout:
+                buffer = ""
+                while True:
+                    chunk = await process.stdout.read(1024)
+                    if not chunk:
+                        break
+                    
+                    buffer += chunk.decode('utf-8', errors='ignore')
+                    
+                    # Write raw output to log file
+                    try:
+                        log_fp.write(chunk.decode('utf-8', errors='ignore'))
+                        log_fp.flush()
+                    except:
+                        pass
+                    
+                    # Process complete lines
+                    while '\n' in buffer:
+                        line, buffer = buffer.split('\n', 1)
+                        if line.strip():
+                            log_entry = parse_log_line(line)
+                            if log_entry:
+                                add_log(log_entry)
+                                
+                                # Update progress and pipeline stage based on log content
+                                line_upper = line.upper()
+                                
+                                # Stage 1: Perturbation → RNA
+                                if ("RNA" in line_upper and "PREDICT" in line_upper) or ("STATE" in line_upper and "INFERENCE" in line_upper):
+                                    status.pipeline_stage = "rna"
+                                    status.progress = min(0.5, status.progress + 0.1)
+                                    add_log({"type": "MODEL", "message": "RNA prediction in progress..."})
+                                
+                                # Stage 2: RNA → Protein
+                                elif ("PROTEIN" in line_upper and "PREDICT" in line_upper) or ("SCTRANSLATOR" in line_upper and "INFERENCE" in line_upper):
+                                    status.pipeline_stage = "protein"
+                                    status.progress = min(0.7, status.progress + 0.1)
+                                    add_log({"type": "MODEL", "message": "Protein prediction in progress..."})
+                                
+                                # Stage 3: Pathway Analysis
+                                elif "PATHWAY" in line_upper or "DIFFERENTIAL" in line_upper or "GSEA" in line_upper:
+                                    status.pipeline_stage = "analysis"
+                                    status.progress = min(0.85, status.progress + 0.05)
+                                    add_log({"type": "COMPUTE", "message": "Pathway analysis in progress..."})
+                                    # Don't collect results here - wait until end to avoid repeated calls
+                
+                # Process remaining buffer
+                if buffer.strip():
+                    try:
+                        log_fp.write(buffer)
+                        log_fp.flush()
+                    except:
+                        pass
+                    log_entry = parse_log_line(buffer)
+                    if log_entry:
+                        add_log(log_entry)
+            
+            # Wait for process to complete
+            return_code = await process.wait()
+            
+            # Log completion status
             try:
                 log_fp.write(f"\n{'='*80}\n")
-                log_fp.write("Collecting results from pipeline output...\n")
-                log_fp.write(f"Output directory: {output_dir}\n")
-                log_fp.write(f"Target: {target}\n")
+                log_fp.write(f"Process completed with return code: {return_code}\n")
                 log_fp.flush()
-                
-                results = collect_results_from_pipeline(
-                    str(output_dir),
-                    target
-                )
-                
-                log_fp.write(f"Results collected successfully.\n")
-                log_fp.write(f"Results keys: {list(results.keys())}\n")
-                if "pathway_analysis" in results:
-                    log_fp.write(f"Pathway analysis keys: {list(results['pathway_analysis'].keys())}\n")
+            except:
+                pass
+            
+            if return_code != 0:
+                error_msg = f"Pipeline failed with return code {return_code}"
+                add_log({"type": "ERROR", "message": error_msg})
+                raise RuntimeError(error_msg)
+            
+            status.current_step = "Processing results"
+            status.progress = 0.85
+            status.pipeline_stage = "analysis"
+            add_log({"type": "COMPUTE", "message": "Collecting results from pipeline output"})
+            
+            # Collect results from output directory
+            if LLM_AVAILABLE:
+                try:
+                    log_fp.write(f"\n{'='*80}\n")
+                    log_fp.write("Collecting results from pipeline output...\n")
+                    log_fp.write(f"Output directory: {output_dir}\n")
+                    log_fp.write(f"Target: {target}\n")
+                    log_fp.flush()
+                    
+                    results = collect_results_from_pipeline(
+                        str(output_dir),
+                        target
+                    )
+                    
+                    log_fp.write(f"Results collected successfully.\n")
+                    log_fp.write(f"Results keys: {list(results.keys())}\n")
+                    if "pathway_analysis" in results:
+                        log_fp.write(f"Pathway analysis keys: {list(results['pathway_analysis'].keys())}\n")
+                    log_fp.flush()
+                    
+                    add_log({"type": "COMPUTE", "message": "Results collected successfully"})
+                except Exception as e:
+                    import traceback
+                    error_trace = traceback.format_exc()
+                    log_fp.write(f"\n{'!'*80}\n")
+                    log_fp.write(f"ERROR collecting results: {str(e)}\n")
+                    log_fp.write(f"{error_trace}\n")
+                    log_fp.write(f"{'!'*80}\n")
+                    log_fp.flush()
+                    
+                    print(f"Warning: Could not collect results using LLM output module: {e}")
+                    add_log({"type": "ERROR", "message": f"Could not collect results: {str(e)}"})
+                    # Fallback: create basic results structure
+                    results = {
+                        "target_gene": target,
+                        "rna_metrics": {},
+                        "protein_metrics": {},
+                        "pathway_analysis": {}
+                    }
+            else:
+                log_fp.write("LLM module not available, using fallback results structure\n")
                 log_fp.flush()
-                
-                add_log({"type": "COMPUTE", "message": "Results collected successfully"})
-            except Exception as e:
-                import traceback
-                error_trace = traceback.format_exc()
-                log_fp.write(f"\n{'!'*80}\n")
-                log_fp.write(f"ERROR collecting results: {str(e)}\n")
-                log_fp.write(f"{error_trace}\n")
-                log_fp.write(f"{'!'*80}\n")
-                log_fp.flush()
-                
-                print(f"Warning: Could not collect results using LLM output module: {e}")
-                add_log({"type": "ERROR", "message": f"Could not collect results: {str(e)}"})
                 # Fallback: create basic results structure
                 results = {
                     "target_gene": target,
@@ -867,34 +1130,25 @@ async def run_workflow_background(
                     "protein_metrics": {},
                     "pathway_analysis": {}
                 }
-        else:
-            log_fp.write("LLM module not available, using fallback results structure\n")
-            log_fp.flush()
-            # Fallback: create basic results structure
-            results = {
-                "target_gene": target,
-                "rna_metrics": {},
-                "protein_metrics": {},
-                "pathway_analysis": {}
-            }
-        
-        status.current_step = "Completed"
-        status.progress = 1.0
-        status.status = "completed"
-        status.results = results
-        status.pipeline_stage = "completed"
-        add_log({"type": "RESULT", "message": "Hypothesis generation complete. All analyses finished successfully."})
-        
-        # Close log file
-        try:
-            import datetime
-            log_fp.write(f"\n{'='*80}\n")
-            log_fp.write(f"Workflow completed at: {datetime.datetime.now().isoformat()}\n")
-            log_fp.write(f"Status: {status.status}\n")
-            log_fp.write(f"Results collected: {'Yes' if results else 'No'}\n")
-            log_fp.close()
-        except Exception as e:
-            print(f"Error closing log file: {e}")
+            
+            status.current_step = "Completed"
+            status.progress = 1.0
+            status.status = "completed"
+            status.results = results
+            status.pipeline_stage = "completed"
+            add_result_summaries(results)
+            add_log({"type": "RESULT", "message": "Hypothesis generation complete. All analyses finished successfully."})
+            
+            # Close log file
+            try:
+                import datetime
+                log_fp.write(f"\n{'='*80}\n")
+                log_fp.write(f"Workflow completed at: {datetime.datetime.now().isoformat()}\n")
+                log_fp.write(f"Status: {status.status}\n")
+                log_fp.write(f"Results collected: {'Yes' if results else 'No'}\n")
+                log_fp.close()
+            except Exception as e:
+                print(f"Error closing log file: {e}")
             
     except Exception as e:
         import traceback

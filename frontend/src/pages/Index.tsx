@@ -215,48 +215,64 @@ const Index = () => {
       if (pertInfo) {
         setPerturbationInfo(pertInfo);
       }
-      const isGene = infoToUse.type === "KO" || infoToUse.type === "KD" || infoToUse.type === "OE" || 
-                     (infoToUse.target && /^[A-Z]/.test(infoToUse.target));
-      const isDrug = infoToUse.type === "drug" || 
-                     (infoToUse.target && /^[a-z]/.test(infoToUse.target));
+      const normalizeType = (value?: string | null) => (value || "").toLowerCase();
+      const target2Requested = infoToUse.target2_requested || (infoToUse as any).target2Requested;
+      const target2MatchInfo = infoToUse.target2_match_info || (infoToUse as any).target2MatchInfo;
+      const resolvedTarget2 =
+        infoToUse.target2 ||
+        target2MatchInfo?.used_name ||
+        target2MatchInfo?.suggested_name ||
+        target2Requested ||
+        null;
       
-      // Determine if we have both perturbations
-      const hasBoth = infoToUse.has_both === true || (infoToUse.target2 && infoToUse.target);
-      const hasGene2 = infoToUse.type2 === "KO" || infoToUse.type2 === "KD" || infoToUse.type2 === "OE" ||
-                       (infoToUse.target2 && /^[A-Z]/.test(infoToUse.target2));
-      const hasDrug2 = infoToUse.type2 === "drug" ||
-                       (infoToUse.target2 && /^[a-z]/.test(infoToUse.target2));
+      const primaryType = normalizeType(infoToUse.type);
+      const secondaryType = normalizeType(infoToUse.type2);
+      const matchCandidateType = (target2MatchInfo?.candidate_type || "").toLowerCase();
       
-      const hasBothGeneAndDrug = hasBoth && (
-        (isGene && hasDrug2) || (isDrug && hasGene2) ||
-        (isGene && isDrug) || (hasGene2 && hasDrug2)
-      );
+      const primaryIsGene = ["ko", "kd", "oe"].includes(primaryType);
+      const primaryIsDrug = primaryType === "drug";
+      const secondaryIsGene = ["ko", "kd", "oe"].includes(secondaryType) || matchCandidateType === "gene";
+      const secondaryIsDrug = secondaryType === "drug" || matchCandidateType === "drug";
       
-      const pertType: "gene" | "drug" = hasBothGeneAndDrug ? "gene" : ((isGene && isDrug) ? "gene" : (isGene ? "gene" : "drug"));
+      const hasMatchedSecond =
+        Boolean(target2Requested) && Boolean(target2MatchInfo?.used_name || target2MatchInfo?.suggested_name);
+      const hasBothFromLLM = infoToUse.has_both === true || hasMatchedSecond;
       
-      if (hasBothGeneAndDrug) {
-        setPerturbationType("gene");
-        setHasBothPerturbations(true);
-      } else if (isGene && isDrug) {
-        setPerturbationType("gene");
-        setHasBothPerturbations(true);
-      } else if (isGene) {
-        setPerturbationType("gene");
-        setHasBothPerturbations(false);
-      } else if (isDrug) {
-        setPerturbationType("drug");
-        setHasBothPerturbations(false);
+      const pipelinePerturbation: "gene" | "drug" = hasBothFromLLM
+        ? "gene"
+        : primaryIsGene
+        ? "gene"
+        : primaryIsDrug
+        ? "drug"
+        : secondaryIsGene
+        ? "gene"
+        : secondaryIsDrug
+        ? "drug"
+        : "gene";
+      
+      const workflowInfo = { ...infoToUse };
+      if (!workflowInfo.target2 && resolvedTarget2) {
+        workflowInfo.target2 = resolvedTarget2;
       }
+      if (hasBothFromLLM) {
+        workflowInfo.has_both = true;
+      }
+      if (!workflowInfo.type2 && matchCandidateType === "drug") {
+        workflowInfo.type2 = "drug";
+      }
+      
+      setPerturbationType(pipelinePerturbation);
+      setHasBothPerturbations(hasBothFromLLM);
+      setHasGeneInjected(hasBothFromLLM ? true : primaryIsGene || secondaryIsGene);
+      setHasDrugInjected(hasBothFromLLM ? true : primaryIsDrug || secondaryIsDrug);
       
       // Start injection animation immediately for visual feedback - make it very visible
       setIsInjecting(true);
-      setHasGeneInjected(isGene || hasBothGeneAndDrug);
-      setHasDrugInjected((isDrug && !isGene) || hasBothGeneAndDrug);
       
       // Set initial workflow status with a starting log
-      const initMessage = hasBothGeneAndDrug 
-        ? `Starting BOTH perturbations: Gene=${infoToUse.target}, Drug=${infoToUse.target2} (${condition} condition)...`
-        : `Starting ${pertType} perturbation analysis for ${infoToUse.target} (${condition} condition)...`;
+      const initMessage = hasBothFromLLM
+        ? `Starting BOTH perturbations: Gene=${workflowInfo.target}, Drug=${workflowInfo.target2} (${condition} condition)...`
+        : `Starting ${pipelinePerturbation} perturbation analysis for ${workflowInfo.target} (${condition} condition)...`;
       
       setWorkflowStatus({
         status: "running",
@@ -272,9 +288,9 @@ const Index = () => {
       // Start backend workflow
       try {
         const { workflow_id } = await startWorkflow(
-          infoToUse as any,
+          workflowInfo as any,
           condition || "Control",
-          pertType
+          pipelinePerturbation
         );
         
         setWorkflowId(workflow_id);
@@ -293,8 +309,8 @@ const Index = () => {
                 setCompletedNodes((prev) => {
                   const newNodes = [...prev];
                   if (!newNodes.includes("rna")) newNodes.push("rna");
-                  if (pertType === "gene" && !newNodes.includes("perturb-to-rna")) newNodes.push("perturb-to-rna");
-                  if (pertType === "drug" && !newNodes.includes("drug-to-rna")) newNodes.push("drug-to-rna");
+                  if (pipelinePerturbation === "gene" && !newNodes.includes("perturb-to-rna")) newNodes.push("perturb-to-rna");
+                  if (pipelinePerturbation === "drug" && !newNodes.includes("drug-to-rna")) newNodes.push("drug-to-rna");
                   return newNodes;
                 });
               }
@@ -351,11 +367,6 @@ const Index = () => {
             <div>
               <h1 className="text-xl font-bold text-foreground">Cellian</h1>
               <p className="text-xs text-muted-foreground">Multi-Omics Hypothesis Engine</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="text-xs text-muted-foreground bg-secondary/50 px-3 py-1 rounded-full">
-              Type "gene" or "drug" in the chatbot to inject
             </div>
           </div>
         </div>
@@ -485,7 +496,15 @@ const Index = () => {
                     currentStep={workflowStatus?.current_step || undefined}
                     perturbationInfo={perturbationInfo}
                     workflowResults={workflowResults}
+                    currentPerturbationType={workflowStatus?.current_perturbation_type as "gene" | "drug" | "both" | undefined}
                   />
+                  {/* Debug info - remove in production */}
+                  {process.env.NODE_ENV === 'development' && (
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      Debug: pipeline_stage={workflowStatus?.pipeline_stage || 'null'}, 
+                      current_perturbation_type={workflowStatus?.current_perturbation_type || 'null'}
+                    </div>
+                  )}
                 </section>
 
                 {/* Condition selection is now handled in the chatbot */}

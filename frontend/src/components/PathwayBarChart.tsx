@@ -1,4 +1,4 @@
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell, LabelList } from "recharts";
 import { Card } from "@/components/ui/card";
 
 interface PathwayBarChartProps {
@@ -16,20 +16,26 @@ interface PathwayBarChartProps {
 }
 
 export const PathwayBarChart = ({ data, title, maxItems = 20 }: PathwayBarChartProps) => {
-  // Sort by NES or score (absolute value for direction)
-  const sortedData = [...data]
-    .sort((a, b) => {
-      const scoreA = Math.abs(a.NES || a.score || 0);
-      const scoreB = Math.abs(b.NES || b.score || 0);
-      return scoreB - scoreA;
-    })
+  const normalizedData = data.map(item => {
+    const baseScore = item.NES ?? item.score ?? (item.pval ? -Math.log10(item.pval) : 0);
+    const value = Number.isFinite(baseScore) ? baseScore : 0;
+    const displayName = item.name || item.id || "Pathway";
+    return {
+      ...item,
+      value,
+      displayName,
+    };
+  });
+
+  const sortedData = normalizedData
+    .sort((a, b) => Math.abs(b.value) - Math.abs(a.value))
     .slice(0, maxItems)
-    .reverse(); // Reverse for horizontal bar chart (top to bottom)
+    .reverse();
 
   const getColor = (item: any) => {
-    const score = item.NES || item.score || 0;
-    if (score > 0) return "#10b981"; // green for positive/enriched
-    return "#ef4444"; // red for negative/depleted
+    if (item.value > 0) return "#10b981";
+    if (item.value < 0) return "#ef4444";
+    return "#94a3b8";
   };
 
   return (
@@ -45,8 +51,8 @@ export const PathwayBarChart = ({ data, title, maxItems = 20 }: PathwayBarChartP
           <XAxis type="number" />
           <YAxis 
             type="category" 
-            dataKey="name" 
-            width={180}
+            dataKey="displayName" 
+            width={220}
             tick={{ fontSize: 12 }}
           />
           <Tooltip
@@ -55,22 +61,25 @@ export const PathwayBarChart = ({ data, title, maxItems = 20 }: PathwayBarChartP
                 const data = payload[0].payload;
                 return (
                   <div className="bg-background border border-border rounded-lg p-3 shadow-lg">
-                    <p className="font-semibold">{data.name}</p>
+                    <p className="font-semibold">{data.displayName || data.name}</p>
                     <p className="text-sm">Source: {data.source}</p>
                     {data.NES !== undefined && <p className="text-sm">NES: {data.NES.toFixed(3)}</p>}
-                    {data.FDR !== undefined && <p className="text-sm">FDR: {data.FDR.toFixed(4)}</p>}
+                    {data.value !== undefined && data.NES === undefined && (
+                      <p className="text-sm">Score: {data.value.toFixed(3)}</p>
+                    )}
                     {data.pval !== undefined && <p className="text-sm">p-value: {data.pval.toFixed(4)}</p>}
-                    {data.score !== undefined && <p className="text-sm">Score: {data.score.toFixed(3)}</p>}
+                    {data.FDR !== undefined && <p className="text-sm">FDR: {data.FDR.toFixed(4)}</p>}
                   </div>
                 );
               }
               return null;
             }}
           />
-          <Bar dataKey="NES" name="NES">
+          <Bar dataKey="value" name="Score">
             {sortedData.map((entry, index) => (
               <Cell key={`cell-${index}`} fill={getColor(entry)} />
             ))}
+            <LabelList dataKey="value" position="right" formatter={(val: number) => val.toFixed(2)} />
           </Bar>
         </BarChart>
       </ResponsiveContainer>

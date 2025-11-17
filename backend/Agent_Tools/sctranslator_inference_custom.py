@@ -59,10 +59,10 @@ def run_sctranslator_inference_custom(
     protein_path,
     checkpoint_path,
     output_path,
-    test_batch_size=64,  # Reduced to 64 - model requires large contiguous allocations (20+ GiB)
+    test_batch_size=32,  # Reduced to 32 to avoid GPU memory issues
     fix_set=True,
     enc_max_seq_len=20000,
-    dec_max_seq_len=1000,
+    dec_max_seq_len=1000,  # Model was trained with 1000 - cannot be changed (positional embeddings are fixed)
     device='cuda',
     sctranslator_dir="/home/nebius/scTranslator"
 ):

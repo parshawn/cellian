@@ -286,25 +286,29 @@ def prepare_protein_data(rna_adata_path, protein_file_path, target_gene, output_
     else:
         protein_aligned.obs['target_gene'] = target_gene
     
-    # Save prepared protein file
+    # IMPORTANT: Limit to 500 proteins to avoid GPU memory issues
+    # Do this BEFORE saving so the saved file has the truncated version
+    MAX_PROTEINS = 500
+    if len(protein_aligned.var_names) > MAX_PROTEINS:
+        print(f"\n    ⚠️  Truncating to first {MAX_PROTEINS} proteins to avoid GPU memory issues")
+        print(f"       - Original {len(original_protein_names)} proteins are first (guaranteed to be predicted)")
+        print(f"         (from perturb-cite-seq: {original_protein_names[:5]}{'...' if len(original_protein_names) > 5 else ''})")
+        print(f"       - WARNING: {len(protein_aligned.var_names)} total proteins, but only first {MAX_PROTEINS} will be predicted")
+        print(f"       - {len(protein_aligned.var_names) - MAX_PROTEINS} proteins will be excluded due to memory limitation")
+        # Truncate to first MAX_PROTEINS proteins
+        protein_aligned = protein_aligned[:, :MAX_PROTEINS].copy()
+    else:
+        print(f"\n    ⚠️  IMPORTANT NOTES:")
+        print(f"       - scTranslator model will predict up to {MAX_PROTEINS} proteins")
+        print(f"       - All {len(protein_aligned.var_names)} proteins will be predicted")
+    print(f"       - Validation will ONLY use the {len(original_protein_names)} original proteins")
+    
+    # Save prepared protein file (now truncated if needed)
     protein_aligned.write_h5ad(output_path)
     print(f"  ✓ Prepared protein data: {output_path}")
     print(f"    Shape: {protein_aligned.shape} (cells × proteins)")
     print(f"    Number of cells: {protein_aligned.n_obs:,}")
     print(f"    Number of proteins: {protein_aligned.n_vars:,}")
-    
-    # IMPORTANT: Tell user about validation and model limitations
-    print(f"\n    ⚠️  IMPORTANT NOTES:")
-    print(f"       - scTranslator model has a max_seq_len limit of 1000 proteins")
-    print(f"       - If you have more than 1000 proteins, only the first 1000 will be predicted")
-    print(f"       - Original {len(original_protein_names)} proteins are first (guaranteed to be predicted)")
-    print(f"         (from perturb-cite-seq: {original_protein_names[:5]}{'...' if len(original_protein_names) > 5 else ''})")
-    if len(protein_aligned.var_names) > 1000:
-        print(f"       - WARNING: {len(protein_aligned.var_names)} total proteins, but only first 1000 will be predicted")
-        print(f"       - {len(protein_aligned.var_names) - 1000} proteins will be excluded due to model limitation")
-    else:
-        print(f"       - All {len(protein_aligned.var_names)} proteins will be predicted")
-    print(f"       - Validation will ONLY use the {len(original_protein_names)} original proteins")
     
     # Check if values are all zeros (dummy data) or real data
     if hasattr(protein_aligned.X, 'toarray'):

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Legend, ResponsiveContainer, ScatterChart, Scatter, PieChart, Pie, Cell } from "recharts";
@@ -8,6 +9,69 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { VolcanoPlot } from "./VolcanoPlot";
 import { PathwayBarChart } from "./PathwayBarChart";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+type DifferentialEntry = {
+  gene: string;
+  log2fc: number;
+  pval: number;
+  padj: number;
+  direction: "up" | "down";
+};
+
+const resolvePathwayName = (path: any) => {
+  return (
+    path?.name ||
+    path?.pathway_name ||
+    path?.pathway ||
+    path?.Pathway ||
+    path?.term ||
+    path?.Term ||
+    path?.description ||
+    path?.id ||
+    "Pathway"
+  );
+};
+
+const normalizeArray = (data: any): any[] => {
+  if (!data) return [];
+  if (Array.isArray(data)) return data;
+  if (typeof data === "object") return Object.values(data);
+  return [];
+};
+
+const parseDifferentialEntries = (rows: any): DifferentialEntry[] => {
+  return normalizeArray(rows)
+    .map((row: any) => {
+      const log2fc = Number(row.log2fc ?? row.log2FoldChange ?? row["log2FoldChange"] ?? 0) || 0;
+      const pval = Number(row.pval ?? row.pvalue ?? row["p-value"] ?? row.P_value ?? 1);
+      const padj = Number(row.padj ?? row["p.adj"] ?? row.P_adj ?? row.pvalue_adj ?? row.pvalueAdj ?? 1);
+      const gene = row.gene || row.Gene || row.index || row.protein;
+      if (!gene) {
+        return null;
+      }
+      const direction: "up" | "down" = log2fc >= 0 ? "up" : "down";
+      return {
+        gene,
+        log2fc,
+        pval: Number.isFinite(pval) ? pval : 1,
+        padj: Number.isFinite(padj) ? padj : 1,
+        direction,
+      };
+    })
+    .filter(Boolean) as DifferentialEntry[];
+};
+
+const parsePathwayEntries = (entries: any, source: string) => {
+  return normalizeArray(entries).map((p: any) => ({
+    id: p.id || p.pathway_id || resolvePathwayName(p),
+    name: resolvePathwayName(p),
+    source,
+    NES: p.NES || p.nes || p.score || p.NEScore || 0,
+    FDR: p.FDR || p.fdr || p.padj || p.fdr_qval || 1.0,
+    pval: p.pval || p.pvalue || p["p-value"] || p.P_value || 1.0,
+    member_genes: p.member_genes || p.genes || p.leadingEdge || [],
+  }));
+};
 
 interface DashboardProps {
   completedNodes: string[];
@@ -107,26 +171,34 @@ const generateHypotheses = () => [
 ];
 
 // Volcano plot data
-const getVolcanoData = (degs: Array<{gene: string; log2fc: number; pval: number; padj: number; direction: string}>) => {
+const getVolcanoData = (degs: Array<{gene: string; log2fc: number; pval: number; padj: number; direction: "up" | "down"}>) => {
   return degs.map(d => ({
     gene: d.gene,
     x: d.log2fc,
     y: -Math.log10(d.pval),
     pval: d.pval,
+    padj: d.padj,
     log2fc: d.log2fc,
     direction: d.direction,
-    significant: d.padj < 0.05,
+    significant: d.pval < 0.05,
   }));
 };
 
 export const Dashboard = ({ completedNodes, selectedCondition, perturbationType, perturbationName, perturbationName2, workflowResults }: DashboardProps) => {
+  const [resultView, setResultView] = useState<"gene" | "drug">("gene");
   // Extract real data from workflowResults if available, otherwise use mock data
-  let degs: any[] = [];
-  let pathways: any[] = [];
+  let degs: DifferentialEntry[] = [];
+  let degsDrug: DifferentialEntry[] = [];
+  let genePathways: any[] = [];
+  let drugPathways: any[] = [];
   let phenotypes: any[] = [];
   let hypotheses: any[] = [];
   let rnaMetrics: any = {};
   let proteinMetrics: any = {};
+  let proteinDE: DifferentialEntry[] = [];
+  let proteinDEDrug: DifferentialEntry[] = [];
+  let proteinPathwaysGene: any[] = [];
+  let proteinPathwaysDrug: any[] = [];
   
   // Debug: Log what we're receiving
   if (workflowResults) {
@@ -141,83 +213,58 @@ export const Dashboard = ({ completedNodes, selectedCondition, perturbationType,
   }
   
   if (workflowResults) {
-    // Extract DEGs from pathway_analysis
     const pathwayAnalysis = workflowResults.pathway_analysis || {};
-    const diffRNA = pathwayAnalysis.differential_rna;
-    const diffProtein = pathwayAnalysis.differential_protein;
     
-    if (diffRNA && Array.isArray(diffRNA)) {
-      degs = diffRNA.map((row: any) => ({
-        gene: row.gene || row.Gene || row.index,
-        log2fc: row.log2fc || row.log2FoldChange || row['log2FoldChange'] || 0,
-        pval: row.pval || row.pvalue || row['p-value'] || row.P_value || 1.0,
-        padj: row.padj || row.padj || row['p.adj'] || row.P_adj || 1.0,
-        direction: (row.log2fc || row.log2FoldChange || 0) > 0 ? "up" : "down"
-      }));
-    } else if (diffRNA && typeof diffRNA === 'object' && 'to_dict' in diffRNA) {
-      // Handle pandas DataFrame-like object
-      try {
-        const rows = Object.values(diffRNA);
-        degs = rows.map((row: any) => ({
-          gene: row.gene || row.Gene || row.index,
-          log2fc: row.log2fc || row.log2FoldChange || 0,
-          pval: row.pval || row.pvalue || 1.0,
-          padj: row.padj || row.padj || 1.0,
-          direction: (row.log2fc || 0) > 0 ? "up" : "down"
-        }));
-      } catch (e) {
-        console.warn("Could not parse differential RNA data:", e);
-      }
-    }
+    degs = parseDifferentialEntries(pathwayAnalysis.differential_rna);
+    degsDrug = parseDifferentialEntries(
+      pathwayAnalysis.differential_rna_drug || pathwayAnalysis.differential_rna_drug?.data
+    );
     
-    // Extract pathways from GSEA and enrichment results
     const gseaRNA = pathwayAnalysis.gsea_rna;
+    const gseaRNADrug = pathwayAnalysis.gsea_rna_drug;
     const keggEnrichment = pathwayAnalysis.kegg_enrichment;
+    const keggEnrichmentDrug = pathwayAnalysis.kegg_enrichment_drug;
     const reactomeEnrichment = pathwayAnalysis.reactome_enrichment;
+    const reactomeEnrichmentDrug = pathwayAnalysis.reactome_enrichment_drug;
     const goEnrichment = pathwayAnalysis.go_enrichment;
+    const goEnrichmentDrug = pathwayAnalysis.go_enrichment_drug;
     
-    pathways = [];
-    if (gseaRNA && Array.isArray(gseaRNA)) {
-      pathways.push(...gseaRNA.map((p: any) => ({
-        id: p.id || p.pathway_id || p.name,
-        name: p.name || p.pathway_name || p.id,
-        source: "GSEA",
-        NES: p.NES || p.nes || 0,
-        FDR: p.FDR || p.fdr || p.padj || 1.0,
-        pval: p.pval || p.pvalue || p['p-value'] || 1.0,
-        member_genes: p.member_genes || p.genes || []
-      })));
-    }
+    genePathways = [];
+    drugPathways = [];
     
-    if (keggEnrichment && Array.isArray(keggEnrichment)) {
-      pathways.push(...keggEnrichment.map((p: any) => ({
-        id: p.id || p.pathway_id || p.name,
-        name: p.name || p.pathway_name || p.id,
-        source: "KEGG",
-        NES: p.NES || p.nes || 0,
-        FDR: p.FDR || p.fdr || p.padj || 1.0,
-        pval: p.pval || p.pvalue || p['p-value'] || 1.0,
-        member_genes: p.member_genes || p.genes || []
-      })));
-    }
+    const pushGenePathways = (entries: any, source: string) => {
+      genePathways.push(...parsePathwayEntries(entries, source));
+    };
+    const pushDrugPathways = (entries: any, source: string) => {
+      drugPathways.push(...parsePathwayEntries(entries, source));
+    };
     
-    // Extract metrics
+    if (gseaRNA) pushGenePathways(gseaRNA, "GSEA");
+    if (keggEnrichment) pushGenePathways(keggEnrichment, "KEGG");
+    if (reactomeEnrichment) pushGenePathways(reactomeEnrichment, "Reactome");
+    if (goEnrichment) pushGenePathways(goEnrichment, "GO");
+    
+    if (gseaRNADrug) pushDrugPathways(gseaRNADrug, "GSEA");
+    if (keggEnrichmentDrug) pushDrugPathways(keggEnrichmentDrug, "KEGG");
+    if (reactomeEnrichmentDrug) pushDrugPathways(reactomeEnrichmentDrug, "Reactome");
+    if (goEnrichmentDrug) pushDrugPathways(goEnrichmentDrug, "GO");
+    
     rnaMetrics = workflowResults.rna_metrics || {};
     proteinMetrics = workflowResults.protein_metrics || {};
     
-    // Extract hypotheses if available (from LLM output)
     if (workflowResults.hypotheses && Array.isArray(workflowResults.hypotheses)) {
       hypotheses = workflowResults.hypotheses;
     }
     
-    // Extract phenotypes if available
     if (workflowResults.phenotypes && Array.isArray(workflowResults.phenotypes)) {
       phenotypes = workflowResults.phenotypes;
     }
     
     console.log("Dashboard: Extracted data:", {
       degsCount: degs.length,
-      pathwaysCount: pathways.length,
+      drugDegsCount: degsDrug.length,
+      pathwaysCount: genePathways.length,
+      drugPathwaysCount: drugPathways.length,
       phenotypesCount: phenotypes.length,
       hypothesesCount: hypotheses.length,
       hasRNAMetrics: Object.keys(rnaMetrics).length > 0,
@@ -227,76 +274,87 @@ export const Dashboard = ({ completedNodes, selectedCondition, perturbationType,
   
   // Track which data is pending (not using mock data anymore)
   const dataPending = {
-    degs: degs.length === 0,
-    pathways: pathways.length === 0,
+    degs: degs.length === 0 && degsDrug.length === 0,
+    pathways: genePathways.length === 0 && drugPathways.length === 0,
     phenotypes: phenotypes.length === 0,
     hypotheses: hypotheses.length === 0,
   };
   
-  // Extract protein data
-  let proteinDE: any[] = [];
-  let proteinPathways: any[] = [];
+if (workflowResults) {
+  const pathwayAnalysis = workflowResults.pathway_analysis || {};
+  proteinDE = parseDifferentialEntries(pathwayAnalysis.differential_protein);
+  proteinDEDrug = parseDifferentialEntries(pathwayAnalysis.differential_protein_drug);
   
-  if (workflowResults) {
-    const pathwayAnalysis = workflowResults.pathway_analysis || {};
-    const diffProtein = pathwayAnalysis.differential_protein;
-    
-    if (diffProtein && Array.isArray(diffProtein)) {
-      proteinDE = diffProtein.map((row: any) => ({
-        gene: row.gene || row.protein || row.Gene || row.index,
-        log2fc: row.log2fc || row.log2FoldChange || row['log2FoldChange'] || 0,
-        pval: row.pval || row.pvalue || row['p-value'] || row.P_value || 1.0,
-        padj: row.padj || row.padj || row['p.adj'] || row.P_adj || 1.0,
-        direction: (row.log2fc || row.log2FoldChange || 0) > 0 ? "up" : "down"
-      }));
-    }
-    
-    // Extract protein pathways
-    const gseaProtein = pathwayAnalysis.gsea_protein;
-    const keggProtein = pathwayAnalysis.kegg_enrichment;
-    const reactomeProtein = pathwayAnalysis.reactome_enrichment;
-    
-    proteinPathways = [];
-    if (gseaProtein && Array.isArray(gseaProtein)) {
-      proteinPathways.push(...gseaProtein.map((p: any) => ({
-        id: p.id || p.pathway_id || p.name,
-        name: p.name || p.pathway_name || p.id,
-        source: "GSEA",
-        NES: p.NES || p.nes || 0,
-        FDR: p.FDR || p.fdr || p.padj || 1.0,
-        pval: p.pval || p.pvalue || 1.0,
-        member_genes: p.member_genes || p.genes || []
-      })));
-    }
-    if (keggProtein && Array.isArray(keggProtein)) {
-      proteinPathways.push(...keggProtein.map((p: any) => ({
-        id: p.id || p.pathway_id || p.name,
-        name: p.name || p.pathway_name || p.id,
-        source: "KEGG",
-        NES: p.NES || p.nes || 0,
-        FDR: p.FDR || p.fdr || p.padj || 1.0,
-        pval: p.pval || p.pvalue || 1.0,
-        member_genes: p.member_genes || p.genes || []
-      })));
-    }
+  const gseaProtein = pathwayAnalysis.gsea_protein;
+  const gseaProteinDrug = pathwayAnalysis.gsea_protein_drug;
+  const keggProtein = pathwayAnalysis.kegg_enrichment;
+  const keggProteinDrug = pathwayAnalysis.kegg_enrichment_drug;
+  const reactomeProtein = pathwayAnalysis.reactome_enrichment;
+  const reactomeProteinDrug = pathwayAnalysis.reactome_enrichment_drug;
+  
+  proteinPathwaysGene = [];
+  proteinPathwaysDrug = [];
+  
+  if (gseaProtein) proteinPathwaysGene.push(...parsePathwayEntries(gseaProtein, "GSEA"));
+  if (keggProtein) proteinPathwaysGene.push(...parsePathwayEntries(keggProtein, "KEGG"));
+  if (reactomeProtein) proteinPathwaysGene.push(...parsePathwayEntries(reactomeProtein, "Reactome"));
+  
+  if (gseaProteinDrug) proteinPathwaysDrug.push(...parsePathwayEntries(gseaProteinDrug, "GSEA"));
+  if (keggProteinDrug) proteinPathwaysDrug.push(...parsePathwayEntries(keggProteinDrug, "KEGG"));
+  if (reactomeProteinDrug) proteinPathwaysDrug.push(...parsePathwayEntries(reactomeProteinDrug, "Reactome"));
+}
+
+const proteinStageComplete = completedNodes.includes("protein");
+const proteinHasResults =
+  proteinDE.length > 0 ||
+  proteinDEDrug.length > 0 ||
+  proteinPathwaysGene.length > 0 ||
+  proteinPathwaysDrug.length > 0;
+  
+const hasDrugResults =
+  degsDrug.length > 0 ||
+  drugPathways.length > 0 ||
+  proteinDEDrug.length > 0 ||
+  proteinPathwaysDrug.length > 0;
+
+const useDrugData =
+  hasDrugResults &&
+  resultView === "drug" &&
+  (degsDrug.length > 0 || drugPathways.length > 0 || proteinDEDrug.length > 0 || proteinPathwaysDrug.length > 0);
+
+useEffect(() => {
+  if (!hasDrugResults && resultView !== "gene") {
+    setResultView("gene");
   }
+}, [hasDrugResults, resultView]);
+
+const currentRNADE =
+  useDrugData ? (degsDrug.length > 0 ? degsDrug : degs) : (degs.length > 0 ? degs : degsDrug);
+const currentPathways =
+  useDrugData ? (drugPathways.length > 0 ? drugPathways : genePathways) : (genePathways.length > 0 ? genePathways : drugPathways);
+const currentProteinDE =
+  useDrugData ? (proteinDEDrug.length > 0 ? proteinDEDrug : proteinDE) : (proteinDE.length > 0 ? proteinDE : proteinDEDrug);
+const currentProteinPathways =
+  useDrugData
+    ? (proteinPathwaysDrug.length > 0 ? proteinPathwaysDrug : proteinPathwaysGene)
+    : (proteinPathwaysGene.length > 0 ? proteinPathwaysGene : proteinPathwaysDrug);
+
+const currentViewLabel = useDrugData ? "Drug Perturbation" : "Gene Perturbation";
+
+const volcanoDataRNA = getVolcanoData(currentRNADE);
+const volcanoDataProtein = getVolcanoData(currentProteinDE);
+
+const upregulatedRNA = currentRNADE.filter(d => d.direction === "up");
+const downregulatedRNA = currentRNADE.filter(d => d.direction === "down");
+const significantRNA = currentRNADE.filter(d => d.pval < 0.05);
+
+const upregulatedProtein = currentProteinDE.filter(d => d.direction === "up");
+const downregulatedProtein = currentProteinDE.filter(d => d.direction === "down");
+const significantProtein = currentProteinDE.filter(d => d.pval < 0.05);
   
-  // Track protein data pending status (no mock data)
-  const proteinDataPending = {
-    de: proteinDE.length === 0,
-    pathways: proteinPathways.length === 0,
-  };
-  
-  const volcanoDataRNA = getVolcanoData(degs);
-  const volcanoDataProtein = getVolcanoData(proteinDE);
-  
-  const upregulatedRNA = degs.filter(d => d.direction === "up");
-  const downregulatedRNA = degs.filter(d => d.direction === "down");
-  const significantRNA = degs.filter(d => d.padj < 0.05);
-  
-  const upregulatedProtein = proteinDE.filter(d => d.direction === "up");
-  const downregulatedProtein = proteinDE.filter(d => d.direction === "down");
-  const significantProtein = proteinDE.filter(d => d.padj < 0.05);
+  const formatNumber = (value: number, digits = 2) =>
+    Number.isFinite(value) ? value.toFixed(digits) : "—";
+  const isSignificant = (value: number) => Number.isFinite(value) && value < 0.05;
 
   // Determine perturbation label
   const perturbationLabel = perturbationType === "both" 
@@ -322,6 +380,23 @@ export const Dashboard = ({ completedNodes, selectedCondition, perturbationType,
         </div>
       </Card>
       
+      {hasDrugResults && (
+        <div className="flex justify-end">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span>Viewing:</span>
+            <Select value={resultView} onValueChange={(value) => setResultView(value as "gene" | "drug")}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Select view" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="gene">Gene perturbation</SelectItem>
+                <SelectItem value="drug">Drug perturbation</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      )}
+      
       {/* Main Tabs: RNA and Protein */}
       <Tabs defaultValue="rna" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
@@ -344,9 +419,9 @@ export const Dashboard = ({ completedNodes, selectedCondition, perturbationType,
                 <Card className="p-4 bg-gradient-to-br from-rna/10 to-rna/5 border-rna/20">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-muted-foreground">Differential Genes</p>
+                      <p className="text-sm text-muted-foreground">{currentViewLabel} Differential Genes</p>
                       <p className="text-2xl font-bold text-rna">{significantRNA.length}</p>
-                      <p className="text-xs text-muted-foreground mt-1">p-adj &lt; 0.05</p>
+                      <p className="text-xs text-muted-foreground mt-1">p-value &lt; 0.05</p>
                     </div>
                     <Activity className="w-8 h-8 text-rna" />
                   </div>
@@ -373,8 +448,8 @@ export const Dashboard = ({ completedNodes, selectedCondition, perturbationType,
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-muted-foreground">Pathways</p>
-                      <p className="text-2xl font-bold text-protein">{pathways.filter(p => p.FDR < 0.05).length}</p>
-                      <p className="text-xs text-muted-foreground mt-1">FDR &lt; 0.05</p>
+                      <p className="text-2xl font-bold text-protein">{currentPathways.filter(p => (p.pval ?? p.FDR ?? 1) < 0.05).length}</p>
+                      <p className="text-xs text-muted-foreground mt-1">p-value &lt; 0.05</p>
                     </div>
                     <Target className="w-8 h-8 text-protein" />
                   </div>
@@ -384,23 +459,23 @@ export const Dashboard = ({ completedNodes, selectedCondition, perturbationType,
               {/* Volcano Plot for RNA */}
               <VolcanoPlot 
                 data={volcanoDataRNA} 
-                title="RNA Differential Expression - Volcano Plot"
+                title={`${currentViewLabel} RNA Differential Expression - Volcano Plot`}
                 xLabel="log₂ Fold Change"
                 yLabel="-log₁₀(p-value)"
               />
 
               {/* Pathway Analysis for RNA */}
-              {pathways.length > 0 && (
+              {currentPathways.length > 0 && (
                 <PathwayBarChart 
-                  data={pathways} 
-                  title="RNA Pathway Enrichment Analysis (GSEA)"
+                  data={currentPathways} 
+                  title={`${currentViewLabel} RNA Pathway Enrichment Analysis`}
                   maxItems={20}
                 />
               )}
 
               {/* DEGs Table */}
               <Card className="p-6">
-                <h3 className="text-lg font-semibold mb-4">Top Differential Genes</h3>
+                <h3 className="text-lg font-semibold mb-4">Top Differential Genes — {currentViewLabel}</h3>
                 <ScrollArea className="h-[400px]">
                   <table className="w-full text-sm">
                     <thead className="sticky top-0 bg-secondary">
@@ -410,22 +485,30 @@ export const Dashboard = ({ completedNodes, selectedCondition, perturbationType,
                         <th className="text-right p-2 font-semibold">p-value</th>
                         <th className="text-right p-2 font-semibold">p-adj</th>
                         <th className="text-center p-2 font-semibold">Direction</th>
+                        <th className="text-center p-2 font-semibold">Significance</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {degs
+                      {currentRNADE
                         .sort((a, b) => Math.abs(b.log2fc) - Math.abs(a.log2fc))
                         .slice(0, 50)
                         .map((deg, i) => (
                           <tr key={i} className="border-b border-border hover:bg-secondary/50">
                             <td className="p-2 font-medium">{deg.gene}</td>
-                            <td className="p-2 text-right">{deg.log2fc.toFixed(2)}</td>
-                            <td className="p-2 text-right">{deg.pval.toFixed(4)}</td>
-                            <td className="p-2 text-right">{deg.padj.toFixed(4)}</td>
+                            <td className="p-2 text-right">{formatNumber(deg.log2fc, 2)}</td>
+                            <td className="p-2 text-right">{formatNumber(deg.pval, 4)}</td>
+                            <td className="p-2 text-right">{formatNumber(deg.padj, 4)}</td>
                             <td className="p-2 text-center">
                               <Badge variant={deg.direction === "up" ? "default" : "destructive"}>
                                 {deg.direction === "up" ? "↑ Up" : "↓ Down"}
                               </Badge>
+                            </td>
+                            <td className="p-2 text-center">
+                              {isSignificant(deg.pval) ? (
+                                <Badge variant="default">p &lt; 0.05</Badge>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">n.s.</span>
+                              )}
                             </td>
                           </tr>
                         ))}
@@ -443,24 +526,17 @@ export const Dashboard = ({ completedNodes, selectedCondition, perturbationType,
         
         {/* Protein Tab */}
         <TabsContent value="protein" className="space-y-6 mt-6">
-          {completedNodes.includes("protein") ? (
-            proteinDataPending.de || proteinDataPending.pathways ? (
-              <Card className="p-6">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Activity className="w-5 h-5 animate-pulse" />
-                  <p>Result pending... Protein analysis is still processing.</p>
-                </div>
-              </Card>
-            ) : (
+          {proteinStageComplete ? (
+            proteinHasResults ? (
               <>
                 {/* Summary Cards for Protein */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <Card className="p-4 bg-gradient-to-br from-protein/10 to-protein/5 border-protein/20">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm text-muted-foreground">Differential Proteins</p>
+                        <p className="text-sm text-muted-foreground">{currentViewLabel} Differential Proteins</p>
                         <p className="text-2xl font-bold text-protein">{significantProtein.length}</p>
-                        <p className="text-xs text-muted-foreground mt-1">p-adj &lt; 0.05</p>
+                        <p className="text-xs text-muted-foreground mt-1">p-value &lt; 0.05</p>
                       </div>
                       <FlaskConical className="w-8 h-8 text-protein" />
                     </div>
@@ -483,49 +559,39 @@ export const Dashboard = ({ completedNodes, selectedCondition, perturbationType,
                       <TrendingDown className="w-8 h-8 text-red-600" />
                     </div>
                   </Card>
-                  <Card className="p-4 bg-gradient-to-br from-protein/10 to-protein/5 border-protein/20">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Pathways</p>
-                        <p className="text-2xl font-bold text-protein">{proteinPathways.filter(p => p.FDR < 0.05).length}</p>
-                        <p className="text-xs text-muted-foreground mt-1">FDR &lt; 0.05</p>
-                      </div>
-                      <Target className="w-8 h-8 text-protein" />
-                    </div>
-                  </Card>
                 </div>
 
                 {/* Volcano Plot for Protein */}
-                {proteinDE.length > 0 ? (
+                {currentProteinDE.length > 0 ? (
                   <VolcanoPlot 
                     data={volcanoDataProtein} 
-                    title="Protein Differential Expression - Volcano Plot"
+                    title={`${currentViewLabel} Protein Differential Expression - Volcano Plot`}
                     xLabel="log₂ Fold Change"
                     yLabel="-log₁₀(p-value)"
                   />
                 ) : (
                   <Card className="p-6">
-                    <p className="text-muted-foreground">Result pending... Volcano plot data not yet available.</p>
+                    <p className="text-muted-foreground">No differential protein signals available for this view.</p>
                   </Card>
                 )}
 
                 {/* Pathway Analysis for Protein */}
-                {proteinPathways.length > 0 ? (
+                {currentProteinPathways.length > 0 ? (
                   <PathwayBarChart 
-                    data={proteinPathways} 
-                    title="Protein Pathway Enrichment Analysis (GSEA)"
+                    data={currentProteinPathways} 
+                    title={`${currentViewLabel} Protein Pathway Enrichment Analysis`}
                     maxItems={20}
                   />
                 ) : (
                   <Card className="p-6">
-                    <p className="text-muted-foreground">Result pending... Pathway analysis not yet available.</p>
+                    <p className="text-muted-foreground">No enriched protein pathways detected for this view.</p>
                   </Card>
                 )}
 
                 {/* Protein DE Table */}
-                {proteinDE.length > 0 ? (
+                {currentProteinDE.length > 0 ? (
                   <Card className="p-6">
-                    <h3 className="text-lg font-semibold mb-4">Top Differential Proteins</h3>
+                    <h3 className="text-lg font-semibold mb-4">Top Differential Proteins — {currentViewLabel}</h3>
                     <ScrollArea className="h-[400px]">
                       <table className="w-full text-sm">
                         <thead className="sticky top-0 bg-secondary">
@@ -535,22 +601,30 @@ export const Dashboard = ({ completedNodes, selectedCondition, perturbationType,
                             <th className="text-right p-2 font-semibold">p-value</th>
                             <th className="text-right p-2 font-semibold">p-adj</th>
                             <th className="text-center p-2 font-semibold">Direction</th>
+                            <th className="text-center p-2 font-semibold">Significance</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {proteinDE
+                          {currentProteinDE
                             .sort((a, b) => Math.abs(b.log2fc) - Math.abs(a.log2fc))
                             .slice(0, 50)
                             .map((deg, i) => (
                               <tr key={i} className="border-b border-border hover:bg-secondary/50">
                                 <td className="p-2 font-medium">{deg.gene}</td>
-                                <td className="p-2 text-right">{deg.log2fc.toFixed(2)}</td>
-                                <td className="p-2 text-right">{deg.pval.toFixed(4)}</td>
-                                <td className="p-2 text-right">{deg.padj.toFixed(4)}</td>
+                                <td className="p-2 text-right">{formatNumber(deg.log2fc, 2)}</td>
+                                <td className="p-2 text-right">{formatNumber(deg.pval, 4)}</td>
+                                <td className="p-2 text-right">{formatNumber(deg.padj, 4)}</td>
                                 <td className="p-2 text-center">
                                   <Badge variant={deg.direction === "up" ? "default" : "destructive"}>
                                     {deg.direction === "up" ? "↑ Up" : "↓ Down"}
                                   </Badge>
+                                </td>
+                                <td className="p-2 text-center">
+                                  {isSignificant(deg.pval) ? (
+                                    <Badge variant="default">p &lt; 0.05</Badge>
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground">n.s.</span>
+                                  )}
                                 </td>
                               </tr>
                             ))}
@@ -564,6 +638,18 @@ export const Dashboard = ({ completedNodes, selectedCondition, perturbationType,
                   </Card>
                 )}
               </>
+            ) : (
+              <Card className="p-6">
+                <div className="flex flex-col gap-2 text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <Activity className="w-5 h-5 text-protein animate-pulse" />
+                    <p>No significant protein changes detected (p-value ≥ 0.05).</p>
+                  </div>
+                  <p className="text-xs">
+                    Live logs will continue streaming in the reasoning panel even after analysis completes.
+                  </p>
+                </div>
+              </Card>
             )
           ) : (
             <Card className="p-6">

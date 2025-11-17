@@ -10,6 +10,7 @@ import warnings
 import tempfile
 import subprocess
 import shutil
+from pathlib import Path
 
 import scanpy as sc
 import anndata as ad
@@ -240,11 +241,6 @@ def run_sctranslator_inference_custom(
     y_pred = pd.DataFrame(y_hat, columns=scP_adata.var.index.tolist())
     y_truth = pd.DataFrame(y, columns=scP_adata.var.index.tolist())
     
-    # Clear intermediate numpy arrays if they're large
-    del y_hat, y
-    if use_cuda:
-        torch.cuda.empty_cache()
-    
     # Set cell indices
     if len(y_pred) == len(scRNA_adata):
         y_pred.index = scRNA_adata.obs.index[:len(y_pred)]
@@ -252,15 +248,91 @@ def run_sctranslator_inference_custom(
     
     print(f"    Predictions shape: {y_pred.shape} (cells × proteins)")
     
-    # Calculate metrics
+    # VALIDATION: Calculate metrics only on proteins that exist in perturb-cite-seq dataset
+    # Load perturb-cite-seq protein data to get the list of validation proteins
+    # Get path relative to this file's location
+    current_file_dir = Path(__file__).parent.parent
+    perturb_citeseq_path = current_file_dir / "data" / "perturb-cite-seq" / "SCP1064" / "expression" / "protein_expression.h5ad"
+    validation_mse = test_loss
+    validation_ccc = test_ccc
+    
+    if perturb_citeseq_path.exists():
+        try:
+            print(f"    Loading perturb-cite-seq data for validation: {perturb_citeseq_path}")
+            perturb_citeseq_adata = ad.read_h5ad(perturb_citeseq_path)
+            perturb_citeseq_proteins = set(perturb_citeseq_adata.var_names)
+            print(f"    Found {len(perturb_citeseq_proteins)} proteins in perturb-cite-seq dataset")
+            
+            # Find which proteins in our predictions match perturb-cite-seq proteins
+            predicted_proteins = set(y_pred.columns)
+            common_proteins = predicted_proteins.intersection(perturb_citeseq_proteins)
+            
+            if len(common_proteins) > 0:
+                print(f"    Validating on {len(common_proteins)} proteins that match perturb-cite-seq: {sorted(list(common_proteins))[:10]}...")
+                
+                # Filter predictions and truth to only common proteins
+                y_pred_filtered = y_pred[list(common_proteins)]
+                y_truth_filtered = y_truth[list(common_proteins)]
+                
+                # Calculate MSE and CCC on filtered proteins only
+                import torch.nn.functional as F
+                import torch
+                
+                # Convert to tensors for metric calculation
+                y_pred_tensor = torch.tensor(y_pred_filtered.values, dtype=torch.float32)
+                y_truth_tensor = torch.tensor(y_truth_filtered.values, dtype=torch.float32)
+                
+                # Remove NaN values
+                valid_mask = ~(torch.isnan(y_truth_tensor) | torch.isnan(y_pred_tensor))
+                if valid_mask.any():
+                    y_pred_valid = y_pred_tensor[valid_mask]
+                    y_truth_valid = y_truth_tensor[valid_mask]
+                    
+                    # Calculate MSE
+                    validation_mse = F.mse_loss(y_pred_valid, y_truth_valid).item()
+                    
+                    # Calculate CCC (Concordance Correlation Coefficient)
+                    # CCC = 2 * covariance / (variance_pred + variance_truth + (mean_pred - mean_truth)^2)
+                    mean_pred = y_pred_valid.mean().item()
+                    mean_truth = y_truth_valid.mean().item()
+                    var_pred = y_pred_valid.var(unbiased=False).item()
+                    var_truth = y_truth_valid.var(unbiased=False).item()
+                    cov = ((y_pred_valid - mean_pred) * (y_truth_valid - mean_truth)).mean().item()
+                    
+                    denominator = var_pred + var_truth + (mean_pred - mean_truth) ** 2
+                    if denominator > 0:
+                        validation_ccc = 2 * cov / denominator
+                    else:
+                        validation_ccc = 0.0
+                    
+                    print(f"    ✓ Validation metrics calculated on {len(common_proteins)} perturb-cite-seq proteins")
+                else:
+                    print(f"    Warning: No valid (non-NaN) values found for validation proteins")
+            else:
+                print(f"    Warning: No proteins in predictions match perturb-cite-seq proteins")
+                print(f"    Predicted proteins: {sorted(list(predicted_proteins))[:10]}...")
+                print(f"    Perturb-cite-seq proteins: {sorted(list(perturb_citeseq_proteins))}")
+        except Exception as e:
+            print(f"    Warning: Could not load perturb-cite-seq data for validation: {e}")
+            print(f"    Using metrics calculated on all proteins")
+    else:
+        print(f"    Warning: Perturb-cite-seq data not found at {perturb_citeseq_path}")
+        print(f"    Using metrics calculated on all proteins")
+    
+    # Clear intermediate numpy arrays if they're large
+    del y_hat, y
+    if use_cuda:
+        torch.cuda.empty_cache()
+    
+    # Calculate metrics (use validation metrics if available)
     metrics = {
-        'test_loss': test_loss,
-        'test_ccc': test_ccc,
-        'mse': test_loss,
-        'ccc': test_ccc
+        'test_loss': validation_mse,
+        'test_ccc': validation_ccc,
+        'mse': validation_mse,
+        'ccc': validation_ccc
     }
     
-    print(f"    Metrics:")
+    print(f"    Validation Metrics (perturb-cite-seq proteins only):")
     print(f"      MSE: {metrics['mse']:.4f}")
     print(f"      CCC: {metrics['ccc']:.4f}")
     

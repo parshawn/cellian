@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useEffect } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Sphere, Line, Text } from "@react-three/drei";
 import * as THREE from "three";
@@ -18,6 +18,7 @@ interface TranslatorNetwork3DProps {
     type2?: string;
   };
   workflowResults?: any; // Results from backend for DEA stats
+  currentPerturbationType?: "gene" | "drug" | "both"; // Which perturbation is currently running
 }
 
 interface Node3DProps {
@@ -111,27 +112,15 @@ interface Connection3DProps {
 
 const Connection3D = ({ start, end, color, isActive }: Connection3DProps) => {
   const points: [number, number, number][] = [start, end];
-  
-  // Calculate midpoint for arrow
-  const midPoint = new THREE.Vector3(...start).add(new THREE.Vector3(...end)).multiplyScalar(0.5);
 
   return (
-    <>
-      <Line
-        points={points}
-        color={color}
-        lineWidth={isActive ? 4 : 2}
-        transparent
-        opacity={isActive ? 1 : 0.4}
-      />
-      {/* Arrow head */}
-      {isActive && (
-        <mesh position={[midPoint.x, midPoint.y, midPoint.z]}>
-          <coneGeometry args={[0.08, 0.25, 8]} />
-          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.8} />
-        </mesh>
-      )}
-    </>
+    <Line
+      points={points}
+      color={color}
+      lineWidth={isActive ? 4 : 2}
+      transparent
+      opacity={isActive ? 1 : 0.4}
+    />
   );
 };
 
@@ -145,6 +134,7 @@ const NetworkScene = ({
   currentStep,
   perturbationInfo,
   workflowResults,
+  currentPerturbationType,
 }: TranslatorNetwork3DProps) => {
   // Node positions in 3D space - spread out more for bigger graph
   const nodePositions = {
@@ -167,31 +157,47 @@ const NetworkScene = ({
   };
 
   const isConnectionActive = (connectionId: string) => {
-    // Check if connection is in completed nodes or active path
+    // Check if connection is in completed nodes (already processed)
     if (completedNodes.includes(connectionId)) return true;
     
-    // Highlight edges based on pipeline stage
-    if (pipelineStage === "perturbation") {
-      // During perturbation, highlight connections from perturbation/drug to RNA
-      if (connectionId === "perturb-to-rna" || connectionId === "drug-to-rna") {
-        return activePath.includes("perturbation") || activePath.includes("drug");
-      }
-    } else if (pipelineStage === "rna") {
-      // During RNA stage, highlight perturbation/drug to RNA connection
-      if (connectionId === "perturb-to-rna" || connectionId === "drug-to-rna") {
+    // Determine which perturbation type is currently running
+    const isGeneRunning = currentPerturbationType === "gene" || 
+                         (currentPerturbationType === "both" && activePath.includes("perturbation"));
+    const isDrugRunning = currentPerturbationType === "drug" || 
+                         (currentPerturbationType === "both" && activePath.includes("drug"));
+    
+    // Primary logic: Highlight edges based on pipeline stage and perturbation type
+    // Stage 1: Perturbation → RNA (during perturbation or rna stage)
+    if (pipelineStage === "perturbation" || pipelineStage === "rna") {
+      // During perturbation/RNA stage, highlight the correct edge based on which perturbation is running
+      if (connectionId === "perturb-to-rna" && isGeneRunning) {
         return true;
       }
-    } else if (pipelineStage === "protein") {
-      // During protein stage, highlight RNA to protein connection
+      if (connectionId === "drug-to-rna" && isDrugRunning) {
+        return true;
+      }
+      return false;
+    } 
+    
+    // Stage 2: RNA → Protein (during protein stage)
+    if (pipelineStage === "protein") {
+      // During protein stage, highlight RNA to protein connection (scTranslator inference)
       if (connectionId === "rna-to-protein") {
         return true;
       }
-      // Also keep previous connections active
-      if (connectionId === "perturb-to-rna" || connectionId === "drug-to-rna") {
+      // Also keep previous connections active (show the full path so far)
+      if (connectionId === "perturb-to-rna" && isGeneRunning) {
         return true;
       }
-    } else if (pipelineStage === "analysis") {
-      // During analysis, all connections should be active
+      if (connectionId === "drug-to-rna" && isDrugRunning) {
+        return true;
+      }
+      return false;
+    } 
+    
+    // Stage 3: Analysis/Completed (all connections active)
+    if (pipelineStage === "analysis" || pipelineStage === "completed") {
+      // During analysis/completed, all connections should be active (full pipeline complete)
       return true;
     }
     
@@ -204,6 +210,30 @@ const NetworkScene = ({
     const [startNode, endNode] = connectionMap[connectionId] || ["", ""];
     return activePath.includes(startNode) && activePath.includes(endNode);
   };
+  
+  // Debug logging in development
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      const isGeneRunning = currentPerturbationType === "gene" || 
+                           (currentPerturbationType === "both" && activePath.includes("perturbation"));
+      const isDrugRunning = currentPerturbationType === "drug" || 
+                           (currentPerturbationType === "both" && activePath.includes("drug"));
+      
+      const perturbToRna = (pipelineStage === "perturbation" || pipelineStage === "rna") && isGeneRunning;
+      const drugToRna = (pipelineStage === "perturbation" || pipelineStage === "rna") && isDrugRunning;
+      const rnaToProtein = pipelineStage === "protein";
+      
+      console.log('[TranslatorNetwork3D]', {
+        pipelineStage,
+        currentPerturbationType,
+        activePath,
+        completedNodes,
+        'perturb-to-rna': perturbToRna || completedNodes.includes("perturb-to-rna"),
+        'drug-to-rna': drugToRna || completedNodes.includes("drug-to-rna"),
+        'rna-to-protein': rnaToProtein || completedNodes.includes("rna-to-protein"),
+      });
+    }
+  }, [pipelineStage, currentPerturbationType, activePath, completedNodes]);
 
   const isNodeHighlighted = (nodeId: string) => {
     // Highlight if it's the current active node in the path

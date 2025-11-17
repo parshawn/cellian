@@ -726,6 +726,12 @@ def comprehensive_analysis(
     rna_pred = ad.read_h5ad(rna_predictions_path)
     protein_pred = ad.read_h5ad(protein_predictions_path)
     
+    # Limit to 500 proteins to match scTranslator inference limit
+    MAX_PROTEINS = 500
+    if protein_pred.n_vars > MAX_PROTEINS:
+        print(f"  ⚠️  Truncating protein predictions to first {MAX_PROTEINS} proteins (to match scTranslator inference)")
+        protein_pred = protein_pred[:, :MAX_PROTEINS].copy()
+    
     print(f"  RNA predictions: {rna_pred.shape}")
     print(f"  Protein predictions: {protein_pred.shape}")
     
@@ -743,8 +749,20 @@ def comprehensive_analysis(
         control_rna_filtered = filter_control_data(control_rna, control_label=control_label)
         control_protein_filtered = filter_control_data(control_protein, control_label=control_label)
         
+        # Limit control protein to 500 proteins to match predictions
+        if control_protein_filtered.n_vars > MAX_PROTEINS:
+            print(f"  ⚠️  Truncating control protein to first {MAX_PROTEINS} proteins (to match predictions)")
+            control_protein_filtered = control_protein_filtered[:, :MAX_PROTEINS].copy()
+        elif control_protein_filtered.n_vars < MAX_PROTEINS * 0.5:
+            print(f"  ⚠️  Control protein data only has {control_protein_filtered.n_vars} markers (<50% of predictions).")
+            print("     Falling back to internal control cells from predictions for protein DEA to keep 500 markers.")
+            control_protein_filtered = None
+        
         print(f"  Control RNA (filtered): {control_rna_filtered.shape}")
-        print(f"  Control protein (filtered): {control_protein_filtered.shape}")
+        if control_protein_filtered is not None:
+            print(f"  Control protein (filtered): {control_protein_filtered.shape}")
+        else:
+            print(f"  Control protein (filtered): using internal control cells from predictions")
     
     results = {}
     

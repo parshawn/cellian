@@ -21,6 +21,27 @@ export const VolcanoPlot = ({ data, title, xLabel = "log₂ Fold Change", yLabel
     return point.direction === "up" ? "#ef4444" : "#3b82f6"; // red for up, blue for down
   };
 
+  const labeledPoints = [...data]
+    .filter((point) => point.significant)
+    .sort((a, b) => (b.y ?? 0) - (a.y ?? 0))
+    .slice(0, 8);
+
+  const renderLabel = (props: any) => {
+    const { cx, cy, payload } = props;
+    if (cx == null || cy == null) return null;
+    return (
+      <text
+        x={cx + 6}
+        y={cy - 6}
+        fill="#475569"
+        fontSize={10}
+        fontWeight={600}
+      >
+        {payload.gene}
+      </text>
+    );
+  };
+
   return (
     <Card className="p-6">
       <h3 className="text-lg font-semibold mb-4">{title}</h3>
@@ -66,16 +87,22 @@ export const VolcanoPlot = ({ data, title, xLabel = "log₂ Fold Change", yLabel
               <Cell key={`cell-${index}`} fill={getColor(entry)} />
             ))}
           </Scatter>
+          {labeledPoints.length > 0 && (
+            <Scatter
+              data={labeledPoints}
+              shape={renderLabel}
+            />
+          )}
         </ScatterChart>
       </ResponsiveContainer>
       <div className="flex items-center justify-center gap-4 mt-4 text-sm">
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 bg-red-500 rounded-full" />
-          <span>Upregulated (p-adj &lt; 0.05)</span>
+          <span>Upregulated (p-value &lt; 0.05)</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 bg-blue-500 rounded-full" />
-          <span>Downregulated (p-adj &lt; 0.05)</span>
+          <span>Downregulated (p-value &lt; 0.05)</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 bg-gray-400 rounded-full" />

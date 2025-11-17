@@ -991,7 +991,7 @@ Examples:
             checkpoint_path=args.sctranslator_checkpoint,
             output_path=protein_pred_path,
             sctranslator_dir=DEFAULT_SCTRANSLATOR_DIR,
-            test_batch_size=64,  # Reduced to 64 - model requires large contiguous allocations (20+ GiB)
+            test_batch_size=32,  # Reduced to 32 to avoid GPU memory issues
             fix_set=True
         )
         

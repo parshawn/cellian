@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 // LogEntry type is now imported from api.ts, but keeping local for compatibility
 interface LogEntry {
@@ -55,18 +55,30 @@ const getLogEntries = (perturbationType: "gene" | "drug" | "both" = "gene") => {
 
 export const ReasoningLog = ({ isActive, perturbationType = "gene", waitingForCondition = false, logs }: ReasoningLogProps) => {
   const [visibleLogs, setVisibleLogs] = useState<number>(0);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const fallbackLogEntries = getLogEntries(perturbationType);
 
   // Use real logs if available, otherwise use fallback
+  // Create a new array reference to ensure React detects changes
   const logEntries = logs && logs.length > 0 
-    ? logs.map(log => ({ type: log.type, message: log.message }))
+    ? logs.map(log => ({ type: log.type || "INFO", message: log.message || "" }))
     : fallbackLogEntries;
+  
+  // Debug: Log when logs change (remove in production)
+  useEffect(() => {
+    if (logs && logs.length > 0) {
+      console.log(`[ReasoningLog] Received ${logs.length} logs, visibleLogs: ${visibleLogs}, displayLogs will be: ${logEntries.length}`);
+    }
+  }, [logs, logs?.length, visibleLogs, logEntries.length]);
 
   useEffect(() => {
     if (isActive) {
       if (logs && logs.length > 0) {
-        // For real logs, show all immediately (they're already filtered/processed)
-        setVisibleLogs(logs.length);
+        // For real logs, always show all logs as they stream in
+        // Update visibleLogs whenever logs array changes (new logs arrive)
+        // Use the actual length to ensure we show all logs
+        const logCount = logs.length;
+        setVisibleLogs(logCount);
       } else {
         // For fallback logs, animate them in
         setVisibleLogs(0);
@@ -85,6 +97,18 @@ export const ReasoningLog = ({ isActive, perturbationType = "gene", waitingForCo
       setVisibleLogs(0);
     }
   }, [isActive, perturbationType, logs, fallbackLogEntries.length]);
+
+  // Auto-scroll to bottom when new logs arrive
+  useEffect(() => {
+    if (logs && logs.length > 0 && scrollContainerRef.current) {
+      // Use setTimeout to ensure DOM has updated
+      setTimeout(() => {
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+        }
+      }, 100);
+    }
+  }, [logs]);
 
   const getTypeColor = (type: string) => {
     switch (type) {
@@ -136,8 +160,9 @@ export const ReasoningLog = ({ isActive, perturbationType = "gene", waitingForCo
   }
 
   // Filter out very verbose or duplicate logs for display
+  // For real logs, be very permissive - only filter obvious noise
   const displayLogs = logEntries.filter((entry, index) => {
-    const msg = entry.message.trim();
+    const msg = entry.message?.trim() || "";
     // Skip empty lines
     if (!msg) {
       return false;
@@ -146,9 +171,19 @@ export const ReasoningLog = ({ isActive, perturbationType = "gene", waitingForCo
     if (msg.replace(/=/g, '').trim().length === 0 && msg.length > 10) {
       return false;
     }
-    // Skip very long lines that are likely data dumps
-    if (entry.message.length > 200) {
-      return false;
+    // For real logs, only skip extremely long lines (likely data dumps)
+    if (logs && logs.length > 0) {
+      // Only skip lines longer than 1000 characters for real logs
+      if (entry.message.length > 1000) {
+        return false;
+      }
+      // Always show real logs - don't filter them out
+      return true;
+    } else {
+      // For fallback logs, use stricter filtering
+      if (entry.message.length > 200) {
+        return false;
+      }
     }
     return true;
   });
@@ -162,17 +197,36 @@ export const ReasoningLog = ({ isActive, perturbationType = "gene", waitingForCo
           <span className="text-xs text-muted-foreground ml-2">({logs.length} logs)</span>
         )}
       </h3>
-      <div className="space-y-2 font-mono text-xs max-h-[300px] overflow-y-auto">
-        {displayLogs.slice(0, visibleLogs).map((entry, index) => (
-          <div
-            key={index}
-            className={logs ? "" : "animate-fade-in"}
-            style={logs ? {} : { animationDelay: `${index * 100}ms` }}
-          >
-            <span className={`font-bold ${getTypeColor(entry.type)}`}>[{entry.type}]</span>{" "}
-            <span className="text-foreground/80">{entry.message}</span>
+      <div 
+        ref={scrollContainerRef}
+        className="space-y-2 font-mono text-xs max-h-[300px] overflow-y-auto"
+      >
+        {displayLogs.length === 0 && logs && logs.length > 0 ? (
+          // If all logs were filtered out, show them anyway (truncated)
+          <div className="text-xs">
+            {logEntries.slice(0, visibleLogs).map((entry, index) => (
+              <div key={`raw-log-${index}`} className="mb-1">
+                <span className={`font-bold ${getTypeColor(entry.type)}`}>[{entry.type}]</span>{" "}
+                <span className="text-foreground/80">
+                  {entry.message.length > 300 
+                    ? `${entry.message.substring(0, 300)}... (truncated)` 
+                    : entry.message}
+                </span>
+              </div>
+            ))}
           </div>
-        ))}
+        ) : (
+          displayLogs.slice(0, visibleLogs).map((entry, index) => (
+            <div
+              key={logs ? `log-${index}-${entry.message.substring(0, 20)}` : `fallback-${index}`}
+              className={logs ? "" : "animate-fade-in"}
+              style={logs ? {} : { animationDelay: `${index * 100}ms` }}
+            >
+              <span className={`font-bold ${getTypeColor(entry.type)}`}>[{entry.type}]</span>{" "}
+              <span className="text-foreground/80">{entry.message}</span>
+            </div>
+          ))
+        )}
         {visibleLogs < displayLogs.length && isActive && !logs && (
           <div className="flex items-center gap-2 text-muted-foreground">
             <div className="w-1 h-1 bg-current rounded-full animate-pulse-glow" />
@@ -180,7 +234,7 @@ export const ReasoningLog = ({ isActive, perturbationType = "gene", waitingForCo
             <div className="w-1 h-1 bg-current rounded-full animate-pulse-glow animation-delay-400" />
           </div>
         )}
-        {logs && logs.length > 0 && isActive && (
+        {logs && logs.length > 0 && isActive && displayLogs.length > 0 && (
           <div className="flex items-center gap-2 text-muted-foreground mt-2">
             <div className="w-1 h-1 bg-current rounded-full animate-pulse-glow" />
             <span className="text-xs">Streaming logs from pipeline...</span>

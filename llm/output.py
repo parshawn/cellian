@@ -315,28 +315,52 @@ def collect_results_from_pipeline(
                 drug_files = glob.glob(drug_pattern)
                 if drug_files:
                     de_rna_files.extend(drug_files)
-                    # Debug: print found files
-                    if drug_files:
-                        print(f"  [DEBUG] Found {len(drug_files)} drug differential expression files via glob")
+                    print(f"  [DEBUG] Found {len(drug_files)} drug differential expression files via glob")
+                    for df in drug_files:
+                        print(f"    [DEBUG] Glob found: {os.path.basename(df)}")
                 
+                # Debug: print all files we're checking
+                print(f"  [DEBUG] Checking {len(de_rna_files)} potential RNA DE files:")
+                for de_rna_file in de_rna_files:
+                    exists = os.path.exists(de_rna_file)
+                    print(f"    [DEBUG] {'✓' if exists else '✗'} {os.path.basename(de_rna_file)}")
+                
+                loaded = False
                 for de_rna_file in de_rna_files:
                     if os.path.exists(de_rna_file):
-                        results["pathway_analysis"]["differential_rna"] = pd.read_csv(de_rna_file)
-                        print(f"  ✓ Loaded differential expression RNA from: {os.path.basename(de_rna_file)}")
-                        break
-                else:
+                        try:
+                            results["pathway_analysis"]["differential_rna"] = pd.read_csv(de_rna_file)
+                            print(f"  ✓ Loaded differential expression RNA from: {os.path.basename(de_rna_file)}")
+                            loaded = True
+                            break
+                        except Exception as e:
+                            print(f"  ⚠️  Error loading {os.path.basename(de_rna_file)}: {e}")
+                            continue
+                
+                if not loaded:
                     # If no file was found, provide more detailed debugging info
-                    if not de_rna_files or not any(os.path.exists(f) for f in de_rna_files):
-                        print(f"  ⚠️  No differential expression RNA files found")
-                        print(f"  [DEBUG] Searched in: {pathway_analysis_dir}")
-                        print(f"  [DEBUG] Searched {len(de_rna_files)} file patterns")
-                        # List what files actually exist
-                        if os.path.exists(pathway_analysis_dir):
-                            actual_files = [f for f in os.listdir(pathway_analysis_dir) if 'differential' in f.lower() and 'rna' in f.lower()]
-                            if actual_files:
-                                print(f"  [DEBUG] Found files in directory: {actual_files[:5]}")
-                            else:
-                                print(f"  [DEBUG] No differential expression RNA files found in directory")
+                    print(f"  ⚠️  No differential expression RNA files found")
+                    print(f"  [DEBUG] Searched in: {pathway_analysis_dir}")
+                    print(f"  [DEBUG] Searched {len(de_rna_files)} file patterns")
+                    # List what files actually exist
+                    if os.path.exists(pathway_analysis_dir):
+                        actual_files = [f for f in os.listdir(pathway_analysis_dir) if 'differential' in f.lower() and 'rna' in f.lower()]
+                        if actual_files:
+                            print(f"  [DEBUG] Found files in directory: {actual_files[:5]}")
+                            # Try to load the first matching file directly
+                            for actual_file in actual_files:
+                                full_path = os.path.join(pathway_analysis_dir, actual_file)
+                                if os.path.exists(full_path):
+                                    try:
+                                        results["pathway_analysis"]["differential_rna"] = pd.read_csv(full_path)
+                                        print(f"  ✓ Loaded differential expression RNA from: {actual_file} (direct match)")
+                                        loaded = True
+                                        break
+                                    except Exception as e:
+                                        print(f"  ⚠️  Error loading {actual_file} directly: {e}")
+                                        continue
+                        else:
+                            print(f"  [DEBUG] No differential expression RNA files found in directory")
                 
                 # Differential expression - Protein
                 # Handle both gene and drug perturbations
@@ -345,16 +369,35 @@ def collect_results_from_pipeline(
                     os.path.join(pathway_analysis_dir, 'differential_expression_protein.csv')
                 ]
                 # For drug perturbations, also check for files with drug name pattern
-                import glob
                 drug_pattern = os.path.join(pathway_analysis_dir, 'differential_expression_protein_*.csv')
                 drug_files = glob.glob(drug_pattern)
                 if drug_files:
                     de_protein_files.extend(drug_files)
                 
+                loaded_protein = False
                 for de_protein_file in de_protein_files:
                     if os.path.exists(de_protein_file):
-                        results["pathway_analysis"]["differential_protein"] = pd.read_csv(de_protein_file)
-                        break
+                        try:
+                            results["pathway_analysis"]["differential_protein"] = pd.read_csv(de_protein_file)
+                            loaded_protein = True
+                            break
+                        except Exception as e:
+                            print(f"  ⚠️  Error loading protein DE file {os.path.basename(de_protein_file)}: {e}")
+                            continue
+                
+                if not loaded_protein and os.path.exists(pathway_analysis_dir):
+                    # Fallback: try to find protein files directly
+                    actual_files = [f for f in os.listdir(pathway_analysis_dir) if 'differential' in f.lower() and 'protein' in f.lower()]
+                    if actual_files:
+                        for actual_file in actual_files:
+                            full_path = os.path.join(pathway_analysis_dir, actual_file)
+                            if os.path.exists(full_path):
+                                try:
+                                    results["pathway_analysis"]["differential_protein"] = pd.read_csv(full_path)
+                                    loaded_protein = True
+                                    break
+                                except Exception as e:
+                                    continue
                 
                 # GSEA - RNA (in gsea_rna/ subdirectory)
                 gsea_dir = os.path.join(pathway_analysis_dir, 'gsea_rna')

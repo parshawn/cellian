@@ -971,13 +971,26 @@ For each hypothesis, provide:
 - A step-by-step mechanism (3-5 steps) explaining how the perturbation leads to the predicted effect
 - Key genes/pathways involved
 
-Format your response as a JSON-like structure with hypotheses as a list. Each hypothesis should have:
-- "statement": "Clear hypothesis statement{" comparing the two perturbations" if is_comparison else ""}"
-- "mechanism": ["Step 1", "Step 2", "Step 3", ...]
-- "key_pathways": ["Pathway 1", "Pathway 2", ...]
-- "key_genes": ["Gene1", "Gene2", ...]
+Format your response as a VALID JSON object with this exact structure:
+{{
+  "hypotheses": [
+    {{
+      "statement": "Clear hypothesis statement{" comparing the two perturbations" if is_comparison else ""}",
+      "mechanism": ["Step 1", "Step 2", "Step 3"],
+      "key_pathways": ["Pathway 1", "Pathway 2"],
+      "key_genes": ["Gene1", "Gene2"]
+    }}
+  ]
+}}
 
-Response:"""
+IMPORTANT: 
+- Return ONLY valid JSON, no markdown code blocks or extra text
+- The "statement" field should contain ONLY the hypothesis text, NOT the JSON key
+- Each "mechanism" should be a list of strings (3-5 steps)
+- Each "key_pathways" should be a list of pathway names
+- Each "key_genes" should be a list of gene names
+
+Response (JSON only):"""
     
     print(f"  [LLM] Sending request to Gemini API (this may take 30-60 seconds)...")
     sys.stdout.flush()
@@ -1004,11 +1017,32 @@ Response:"""
                 llm_hypotheses = []
                 for i, hyp in enumerate(hypotheses_list[:5], 1):
                     if isinstance(hyp, dict):
+                        # Clean statement: remove JSON artifacts like "statement": "..."
+                        statement = hyp.get("statement", "")
+                        if statement:
+                            # Remove JSON key artifacts
+                            statement = re.sub(r'^["\']?statement["\']?\s*:\s*["\']?', '', statement, flags=re.IGNORECASE)
+                            statement = re.sub(r'["\']?\s*,\s*$', '', statement)  # Remove trailing comma/quote
+                            statement = statement.strip('"\'')
+                        
+                        # Ensure mechanism, pathways, genes are lists
+                        mechanism = hyp.get("mechanism", [])
+                        if not isinstance(mechanism, list):
+                            mechanism = [mechanism] if mechanism else []
+                        
+                        key_pathways = hyp.get("key_pathways", [])
+                        if not isinstance(key_pathways, list):
+                            key_pathways = [key_pathways] if key_pathways else []
+                        
+                        key_genes = hyp.get("key_genes", [])
+                        if not isinstance(key_genes, list):
+                            key_genes = [key_genes] if key_genes else []
+                        
                         llm_hypotheses.append({
-                            "statement": hyp.get("statement", ""),
-                            "mechanism": hyp.get("mechanism", []),
-                            "key_pathways": hyp.get("key_pathways", []),
-                            "key_genes": hyp.get("key_genes", [])
+                            "statement": statement,
+                            "mechanism": mechanism,
+                            "key_pathways": key_pathways,
+                            "key_genes": key_genes
                         })
                 if llm_hypotheses:
                     print(f"  [LLM] ✓ Successfully parsed {len(llm_hypotheses)} hypotheses from JSON response")
@@ -1027,11 +1061,32 @@ Response:"""
                     llm_hypotheses = []
                     for i, hyp in enumerate(hypotheses_list[:5], 1):
                         if isinstance(hyp, dict):
+                            # Clean statement: remove JSON artifacts like "statement": "..."
+                            statement = hyp.get("statement", "")
+                            if statement:
+                                # Remove JSON key artifacts
+                                statement = re.sub(r'^["\']?statement["\']?\s*:\s*["\']?', '', statement, flags=re.IGNORECASE)
+                                statement = re.sub(r'["\']?\s*,\s*$', '', statement)  # Remove trailing comma/quote
+                                statement = statement.strip('"\'')
+                            
+                            # Ensure mechanism, pathways, genes are lists
+                            mechanism = hyp.get("mechanism", [])
+                            if not isinstance(mechanism, list):
+                                mechanism = [mechanism] if mechanism else []
+                            
+                            key_pathways = hyp.get("key_pathways", [])
+                            if not isinstance(key_pathways, list):
+                                key_pathways = [key_pathways] if key_pathways else []
+                            
+                            key_genes = hyp.get("key_genes", [])
+                            if not isinstance(key_genes, list):
+                                key_genes = [key_genes] if key_genes else []
+                            
                             llm_hypotheses.append({
-                                "statement": hyp.get("statement", ""),
-                                "mechanism": hyp.get("mechanism", []),
-                                "key_pathways": hyp.get("key_pathways", []),
-                                "key_genes": hyp.get("key_genes", [])
+                                "statement": statement,
+                                "mechanism": mechanism,
+                                "key_pathways": key_pathways,
+                                "key_genes": key_genes
                             })
                     if llm_hypotheses:
                         print(f"  [LLM] ✓ Successfully parsed {len(llm_hypotheses)} hypotheses from JSON code block")
